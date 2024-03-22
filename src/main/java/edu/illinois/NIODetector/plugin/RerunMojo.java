@@ -18,9 +18,9 @@ import java.nio.file.Paths;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.InvocationTargetException;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.platform.launcher.Launcher;
 import org.junit.runner.JUnitCore;
-import org.junit.runner.Result;
-import org.junit.runner.notification.Failure;
 import java.util.ArrayList;
 
 @Mojo(name = "rerun", requiresDependencyResolution = ResolutionScope.TEST)
@@ -72,16 +72,53 @@ public class RerunMojo extends AbstractMojo {
                     mavenPluginAPIVersion + 
                     ".jar";
 
-            // Path to the JUnit JAR file in the local Maven repository
-            String JUnitVersion = DependencyVersionExtractor.getVersion(JUnitCore.class);
-            String JunitJarPath = System.getProperty("user.home") +
+            
+            // Path to the JUnit5 platform JARs file in the local Maven repository
+            String JUnit5PlatformVersion = DependencyVersionExtractor.getVersion(Launcher.class);
+            String Junit5PlatformEngineJarPath = System.getProperty("user.home") +
+                    "/.m2/repository/org/junit/platform/junit-platform-engine/" + 
+                    JUnit5PlatformVersion +
+                    "/junit-platform-engine-" + 
+                    JUnit5PlatformVersion + 
+                    ".jar";
+            String Junit5PlatformLauncherJarPath = System.getProperty("user.home") +
+                    "/.m2/repository/org/junit/platform/junit-platform-launcher/" + 
+                    JUnit5PlatformVersion +
+                    "/junit-platform-launcher-" + 
+                    JUnit5PlatformVersion + 
+                    ".jar";
+            String Junit5PlatformCommonsJarPath = System.getProperty("user.home") +
+                    "/.m2/repository/org/junit/platform/junit-platform-commons/" + 
+                    JUnit5PlatformVersion +
+                    "/junit-platform-commons-" + 
+                    JUnit5PlatformVersion + 
+                    ".jar"; 
+
+            // Path to the JUnit5 API & Jupiter Engine JARs file in the local Maven repository
+            String JUnit5APIAndEngineVersion = DependencyVersionExtractor.getVersion(ExecutionMode.class);
+            String JunitJupiterEngineJarPath = System.getProperty("user.home") +
+                    "/.m2/repository/org/junit/jupiter/junit-jupiter-engine/" + 
+                    JUnit5APIAndEngineVersion +
+                    "/junit-jupiter-engine-" + 
+                    JUnit5APIAndEngineVersion + 
+                    ".jar";
+            String JunitJupiterAPIJarPath = System.getProperty("user.home") +
+                    "/.m2/repository/org/junit/jupiter/junit-jupiter-api/" + 
+                    JUnit5APIAndEngineVersion +
+                    "/junit-jupiter-api-" + 
+                    JUnit5APIAndEngineVersion + 
+                    ".jar";
+            
+            // Path to the JUnit4 JAR file in the local Maven repository
+            String JUnit4Version = DependencyVersionExtractor.getVersion(JUnitCore.class);
+            String Junit4JarPath = System.getProperty("user.home") +
                     "/.m2/repository/junit/junit/" + 
-                    JUnitVersion +
+                    JUnit4Version +
                     "/junit-" + 
-                    JUnitVersion + 
+                    JUnit4Version + 
                     ".jar";
 
-            // Path to the Hamcrest JAR file in the local Maven repository
+            // Path to the Hamcrest JAR file (required for JUnit 4.11+) in the local Maven repository
             String hamcrestVersion = DependencyVersionExtractor.getVersion(CoreMatchers.class);
             String hamcrestJarPath = System.getProperty("user.home") +
                     "/.m2/repository/org/hamcrest/hamcrest-core/" +
@@ -94,10 +131,16 @@ public class RerunMojo extends AbstractMojo {
             URL NIODetectorPluginURL = Paths.get(pluginPath).toUri().toURL();
             URL testClassURL = new File(project.getBuild().getTestOutputDirectory()).toURI().toURL();
             URL mavenPluginApiJarUrl = new File(mavenPluginApiJarPath).toURI().toURL();
-            URL junitJarUrl = new File(JunitJarPath).toURI().toURL();
+            URL Junit5PlatformEngineJarUrl = new File(Junit5PlatformEngineJarPath).toURI().toURL();
+            URL Junit5PlatformLauncherJarUrl = new File(Junit5PlatformLauncherJarPath).toURI().toURL();
+            URL Junit5PlatformCommonsJarUrl = new File(Junit5PlatformCommonsJarPath).toURI().toURL();
+            URL JunitJupiterEngineJarUrl = new File(JunitJupiterEngineJarPath).toURI().toURL();
+            URL JunitJupiterAPIJarUrl = new File(JunitJupiterAPIJarPath).toURI().toURL();
+            URL Junit4JarUrl = new File(Junit4JarPath).toURI().toURL();
             URL hamcrestJarUrl = new File(hamcrestJarPath).toURI().toURL();
 
-            classLoader = new IsolatedURLClassLoader(new URL[]{NIODetectorPluginURL, testClassURL, mavenPluginApiJarUrl, junitJarUrl, hamcrestJarUrl});
+            classLoader = new IsolatedURLClassLoader(new URL[]{NIODetectorPluginURL, testClassURL, mavenPluginApiJarUrl, Junit5PlatformCommonsJarUrl, 
+                Junit5PlatformEngineJarUrl, Junit5PlatformLauncherJarUrl, Junit4JarUrl, hamcrestJarUrl, JunitJupiterEngineJarUrl, JunitJupiterAPIJarUrl});
         } catch (MalformedURLException e) {
             throw new MojoExecutionException("Error creating URLClassLoader", e);
         }
