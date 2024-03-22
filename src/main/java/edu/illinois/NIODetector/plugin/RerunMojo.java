@@ -5,6 +5,7 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.project.MavenProject;
+import org.hamcrest.CoreMatchers;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -62,27 +63,38 @@ public class RerunMojo extends AbstractMojo {
             String pluginPath = mavenRepoDir + "/" + groupId.replace('.', '/') + "/" + artifactId + 
                                 "/" + version + "/" + artifactId + "-" + version + ".jar";
 
-            // Convert the NIODetector path to a URL
-            URL NIODetectorPluginURL = Paths.get(pluginPath).toUri().toURL();
-
-            // Convert project test classes path to a URL
-            URL testClassURL = new File(project.getBuild().getTestOutputDirectory()).toURI().toURL();
-
             // Path to the maven-plugin-api JAR file in the local Maven repository
+            String mavenPluginAPIVersion = DependencyVersionExtractor.getVersion(MojoExecutionException.class);
             String mavenPluginApiJarPath = System.getProperty("user.home") +
-                    "/.m2/repository/org/apache/maven/maven-plugin-api/3.8.1/maven-plugin-api-3.8.1.jar";
+                    "/.m2/repository/org/apache/maven/maven-plugin-api/" +
+                    mavenPluginAPIVersion +
+                    "/maven-plugin-api-" +
+                    mavenPluginAPIVersion + 
+                    ".jar";
 
             // Path to the JUnit JAR file in the local Maven repository
-            String junitJarPath = System.getProperty("user.home") +
-                    "/.m2/repository/junit/junit/4.11/junit-4.11.jar";
+            String JUnitVersion = DependencyVersionExtractor.getVersion(JUnitCore.class);
+            String JunitJarPath = System.getProperty("user.home") +
+                    "/.m2/repository/junit/junit/" + 
+                    JUnitVersion +
+                    "/junit-" + 
+                    JUnitVersion + 
+                    ".jar";
 
             // Path to the Hamcrest JAR file in the local Maven repository
+            String hamcrestVersion = DependencyVersionExtractor.getVersion(CoreMatchers.class);
             String hamcrestJarPath = System.getProperty("user.home") +
-                    "/.m2/repository/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar";
+                    "/.m2/repository/org/hamcrest/hamcrest-core/" +
+                    hamcrestVersion + 
+                    "/hamcrest-core-" + 
+                    hamcrestVersion + 
+                    ".jar";
 
             // Convert the paths to URLs
+            URL NIODetectorPluginURL = Paths.get(pluginPath).toUri().toURL();
+            URL testClassURL = new File(project.getBuild().getTestOutputDirectory()).toURI().toURL();
             URL mavenPluginApiJarUrl = new File(mavenPluginApiJarPath).toURI().toURL();
-            URL junitJarUrl = new File(junitJarPath).toURI().toURL();
+            URL junitJarUrl = new File(JunitJarPath).toURI().toURL();
             URL hamcrestJarUrl = new File(hamcrestJarPath).toURI().toURL();
 
             classLoader = new IsolatedURLClassLoader(new URL[]{NIODetectorPluginURL, testClassURL, mavenPluginApiJarUrl, junitJarUrl, hamcrestJarUrl});
@@ -90,27 +102,20 @@ public class RerunMojo extends AbstractMojo {
             throw new MojoExecutionException("Error creating URLClassLoader", e);
         }
     
-        // Kick off the whole JUnit job from a class loaded by this ClassLoader
+        // Run the whole JUnit testing from a class loaded by this ClassLoader
         try {
-            // Load ClassLoaderIsolatedTestRunner using the IsolatedURLClassLoader
             Class<?> testRunnerClass = classLoader.loadClass(ClassLoaderIsolatedTestRunner.class.getName());
-
-            // Get the default constructor
             Constructor<?> constructor = testRunnerClass.getDeclaredConstructor();
 
-            // Ensure the constructor is accessible
+            // Ensure the constructor is accessible and create an instance using the constructor
             constructor.setAccessible(true);
-
-            // Create an instance using the constructor
             Object testRunner = constructor.newInstance();
     
             // Invoke run_invokedReflectively method reflectively
             Method runMethod = testRunnerClass.getMethod("run_invokedReflectively", List.class, ClassLoader.class, int.class);
             runMethod.invoke(testRunner, testClassNames, classLoader, numReruns);
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
-            System.out.println(e);
-            e.printStackTrace();
-            //throw new MojoExecutionException("Error invoking ClassLoaderIsolatedTestRunner", e);
+            throw new MojoExecutionException("Error invoking ClassLoaderIsolatedTestRunner", e);
         }
     }
 
