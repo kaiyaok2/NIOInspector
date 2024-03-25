@@ -1,27 +1,17 @@
 package edu.illinois.NIODetector.plugin;
 
 import org.apache.maven.plugin.MojoExecutionException;
-import org.junit.runner.JUnitCore;
-import org.junit.runner.Result;
-import org.junit.runner.notification.Failure;
-import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.launcher.Launcher;
 import org.junit.platform.launcher.core.LauncherFactory;
-import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
-import org.junit.platform.launcher.listeners.TestExecutionSummary;
-import org.junit.platform.launcher.TestIdentifier;
 import org.junit.platform.launcher.listeners.SummaryGeneratingListener;
+import org.junit.platform.engine.discovery.DiscoverySelectors;
+import org.junit.platform.launcher.listeners.TestExecutionSummary;
+import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
+import org.junit.platform.launcher.TestIdentifier;
 
-import org.junit.platform.engine.discovery.ClassNameFilter;
-
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.io.PrintWriter;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -68,49 +58,19 @@ public class ClassLoaderIsolatedTestRunner {
         }
         Class<?>[] classes = classesList.toArray(new Class<?>[0]);
 
-        // Run JUnit 4 tests
-        runJUnit4Tests(classes, classLoader, numReruns);
-
-        // Run JUnit 5 tests
-        runJUnit5Tests(classes, classLoader, numReruns);
+        // Run both JUnit 4 and 5 tests using Vintage Engine
+        runJUnitTests(classes, classLoader, numReruns);
     }
 
     /**
-     * Runs JUnit 4 tests.
+     * Runs JUnit 4/5 tests.
      *
      * @param classes the array of test classes
      * @param classLoader the class loader to use for running the tests
      * @param numReruns the number of times to rerun the tests
      * @throws MojoExecutionException if an error occurs during test execution
      */
-    private void runJUnit4Tests(Class<?>[] classes, ClassLoader classLoader, int numReruns) throws MojoExecutionException {
-        JUnitCore junit = new JUnitCore();
-        ensureLoadedInIsolatedClassLoader(junit);
-        for (int i = 0; i < numReruns; i++) {
-            Result result = junit.run(classes);
-            // Print test results
-            System.out.println("JUnit 4: Number of tests executed: " + result.getRunCount());
-            System.out.println("JUnit 4: Number of tests failed: " + result.getFailureCount());
-
-            // Print details of failed tests
-            if (!result.wasSuccessful()) {
-                System.out.println("Failed tests:");
-                for (Failure failure : result.getFailures()) {
-                    System.out.println(failure.toString());
-                }
-            }
-        }
-    }
-
-    /**
-     * Runs JUnit 5 tests.
-     *
-     * @param classes the array of test classes
-     * @param classLoader the class loader to use for running the tests
-     * @param numReruns the number of times to rerun the tests
-     * @throws MojoExecutionException if an error occurs during test execution
-     */
-    private void runJUnit5Tests(Class<?>[] classes, ClassLoader classLoader, int numReruns) throws MojoExecutionException {
+    private void runJUnitTests(Class<?>[] classes, ClassLoader classLoader, int numReruns) throws MojoExecutionException {
         Thread.currentThread().setContextClassLoader(classLoader);
         Launcher launcher = null;
 
@@ -144,12 +104,7 @@ public class ClassLoaderIsolatedTestRunner {
                     System.out.println("Failure message: " + exception.getMessage());
                     exception.printStackTrace(System.out);
                 }
-                System.out.println("-----------------------------------------");
             });
-            
-            // Print test results
-            System.out.println("JUnit 5: Number of tests successful: " + summary.getTestsSucceededCount());
-            System.out.println("JUnit 5: Number of tests failed: " + summary.getTestsFailedCount());
             
             // Print details of failed tests
             if (summary.getTestsFailedCount() > 0) {

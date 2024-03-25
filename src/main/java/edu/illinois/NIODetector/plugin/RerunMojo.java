@@ -10,6 +10,7 @@ import org.apache.maven.project.MavenProject;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.lang.reflect.Constructor;
@@ -23,6 +24,12 @@ import java.util.List;
  */
 @Mojo(name = "rerun", requiresDependencyResolution = ResolutionScope.TEST)
 public class RerunMojo extends AbstractMojo {
+
+    /**
+     * Comma-separated list of test classes and methods to rerun.
+     */
+    @Parameter(property = "test", defaultValue = "")
+    private String test;
 
     /**
      * Reference to the current Maven project we're rerunning tests on
@@ -50,8 +57,17 @@ public class RerunMojo extends AbstractMojo {
      */
     public void execute() throws MojoExecutionException {
 
-        // Find all test classes in current project to examine
-        List<String> testClassNames = findTestClasses(project.getBuild().getTestOutputDirectory());
+        List<String> testClassNames = new ArrayList<>();
+        if (!(test == null) && !test.isEmpty()) {
+            // Parse the test parameter and extract class and method names
+            String[] tests = test.split(",");
+            for (String testEntry : tests) {
+                testClassNames.add(testEntry.trim());
+            }
+        } else {
+            // If test parameter is not provided, find all test classes
+            testClassNames = findTestClasses(project.getBuild().getTestOutputDirectory());
+        }
     
         URLClassLoader classLoader = null;
         try {
@@ -67,12 +83,18 @@ public class RerunMojo extends AbstractMojo {
                     }
                 }
                 allURLs.addAll(pluginDependencies);
-                List<String> projectDependenciesElements = project.getCompileClasspathElements();
-                List<URL> projectDependencies = new ArrayList<>();
-                for (String dependency : projectDependenciesElements) {
-                    projectDependencies.add(new File(dependency).toURI().toURL());
+                List<String> projectTestDependenciesElements = project.getTestClasspathElements();
+                List<URL> projectTestDependencies = new ArrayList<>();
+                for (String dependency : projectTestDependenciesElements) {
+                    projectTestDependencies.add(new File(dependency).toURI().toURL());
                 }
-                allURLs.addAll(projectDependencies);
+                allURLs.addAll(projectTestDependencies);
+                List<String> projectSystemDependenciesElements = project.getSystemClasspathElements();
+                List<URL> projectSystemDependencies = new ArrayList<>();
+                for (String dependency : projectSystemDependenciesElements) {
+                    projectSystemDependencies.add(new File(dependency).toURI().toURL());
+                }
+                allURLs.addAll(projectSystemDependencies);
             } catch (Exception e) {
                 throw new MojoExecutionException("Error retrieving all dependent Jars", e);
             }
