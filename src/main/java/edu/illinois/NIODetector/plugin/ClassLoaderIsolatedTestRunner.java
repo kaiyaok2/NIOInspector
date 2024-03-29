@@ -1,6 +1,7 @@
 package edu.illinois.NIODetector.plugin;
 
 import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.logging.SystemStreamLog; 
 import org.junit.platform.launcher.Launcher;
 import org.junit.platform.launcher.core.LauncherFactory;
 import org.junit.platform.launcher.listeners.SummaryGeneratingListener;
@@ -9,16 +10,23 @@ import org.junit.platform.launcher.listeners.TestExecutionSummary;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.TestIdentifier;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Utility class for running tests in an isolated class loader.
  */
 public class ClassLoaderIsolatedTestRunner {
+
+    private static final Logger logger = LoggerFactory.getLogger(ClassLoaderIsolatedTestRunner.class);
 
     /**
      * Constructs a ClassLoaderIsolatedTestRunner.
@@ -51,8 +59,8 @@ public class ClassLoaderIsolatedTestRunner {
                 classesList.add(currentClass);
             } catch (Exception | Error e) {
                 String msg = "The [" + test + "] test class is not found.";
-                System.out.println(msg);
-                System.out.println(e);
+                logger.warn(msg);
+                logger.warn(e.toString());
                 continue;
             }
         }
@@ -84,37 +92,118 @@ public class ClassLoaderIsolatedTestRunner {
         }
         ensureLoadedInIsolatedClassLoader(launcher);
 
+        // Custom listener to track test pass status
+        CustomSummaryGeneratingListener listener = new CustomSummaryGeneratingListener();
+        launcher.registerTestExecutionListeners(listener);
+
         LauncherDiscoveryRequestBuilder requestBuilder = LauncherDiscoveryRequestBuilder.request();
         for (Class<?> testClass : classes) {
             requestBuilder.selectors(DiscoverySelectors.selectClass(testClass));
         }
-        for (int i = 0; i < numReruns; i++) {
-            SummaryGeneratingListener listener = new SummaryGeneratingListener();
-            launcher.registerTestExecutionListeners(listener);
-            launcher.execute(requestBuilder.build());
-            TestExecutionSummary summary = listener.getSummary();
-            
-            summary.printTo(new PrintWriter(System.out));
 
-            // Retrieve and print failure messages for failed containers
+        // First Run
+        logger.info("");
+        logger.info("====================Starting the Initial Run of Test====================");
+        logger.info("");
+        launcher.execute(requestBuilder.build());
+        final Map<String, Boolean> testStatusInFirstRun = new HashMap<>(listener.getTestPassStatus());
+        TestExecutionSummary summary = listener.getSummary();
+        printSummary(summary);
+
+        // Reruns
+        Map<String, Integer> NIOtests = new HashMap<>();
+        for (int i = 0; i < numReruns; i++) {
+            logger.info("");
+            logger.info("=======================Starting Rerun #" + (i + 1) + "=========================");
+            logger.info("");
+            final int iteration = i;
+            launcher.execute(requestBuilder.build());
+            summary = listener.getSummary();
             summary.getFailures().forEach(failure -> {
-                System.out.println("Failure in container: " + failure.getTestIdentifier().getDisplayName());
-                Throwable exception = failure.getException();
-                if (exception != null) {
-                    System.out.println("Failure message: " + exception.getMessage());
-                    exception.printStackTrace(System.out);
+                TestIdentifier testIdentifier = failure.getTestIdentifier();
+                String testUniqueId = testIdentifier.getUniqueId();
+                String testString = extractTestMethod(testUniqueId);
+                if (testStatusInFirstRun.containsKey(testUniqueId) && 
+                    testStatusInFirstRun.get(testUniqueId)) {
+                        // Test passed in the first iteration but failed in later iteration
+                        if (NIOtests.containsKey(testString)) {
+                            NIOtests.put(testString, NIOtests.get(testString) + 1);
+                        } else {
+                            NIOtests.put(testString, 1);
+                        }
                 }
             });
-            
-            // Print details of failed tests
-            if (summary.getTestsFailedCount() > 0) {
-                System.out.println("Failed tests:");
-                for (TestExecutionSummary.Failure failure : summary.getFailures()) {
-                    TestIdentifier failedTest = failure.getTestIdentifier();
-                    System.out.println(failedTest.getDisplayName() + ": " + failedTest.getUniqueId());
-                }
+            printSummary(summary);
+        }
+
+        // Log final results
+        logger.info("");
+        logger.info("=========================Final Results=========================");
+        logger.info("");
+        if (NIOtests.isEmpty()) {
+            logger.info("No NIO Tests Found");
+        } else {
+            for (Map.Entry<String, Integer> entry : NIOtests.entrySet()) {
+                logger.error(entry.getKey() + " (passed in the initial run but failed in " +
+                    entry.getValue() + " out of " + numReruns + " reruns)");
             }
         }
+        
+    }
+
+    private void printSummary(TestExecutionSummary summary) {
+        summary.printTo(new PrintWriter(System.out));
+        summary.getFailures().forEach(failure -> {
+            logger.warn("Failure in container: " + failure.getTestIdentifier().getDisplayName());
+            Throwable exception = failure.getException();
+            if (exception != null) {
+                logger.warn("Failure message: " + exception.getMessage());
+                exception.printStackTrace(System.out);
+            }
+        });
+        if (summary.getTestsFailedCount() > 0) {
+            logger.warn("Failed tests:");
+            for (TestExecutionSummary.Failure failure : summary.getFailures()) {
+                TestIdentifier failedTest = failure.getTestIdentifier();
+                System.out.println(failedTest.getDisplayName() + ": " + failedTest.getUniqueId());
+            }
+        }
+    }
+
+    private static String extractTestMethod(String input) {
+        // Find the index of the first occurrence of "[test:"
+        int startIndex = input.indexOf("[test:");
+        if (startIndex == -1) {
+            return ""; // "[test:" not found in the input
+        }
+        
+        // Find the index of the last occurrence of "]"
+        int endIndex = input.lastIndexOf("]");
+        if (endIndex == -1 || endIndex <= startIndex) {
+            return ""; // "]" not found or occurs before "[test:"
+        }
+
+        // Extract the substring between startIndex and endIndex
+        String testInfo = input.substring(startIndex + "[test:".length(), endIndex);
+        
+        int classNameStartIndex = testInfo.indexOf("(");
+        if (classNameStartIndex == -1) {
+            return ""; // Opening parenthesis not found
+        }
+
+        int classNameEndIndex = testInfo.lastIndexOf(")");
+        if (classNameEndIndex == -1 || classNameEndIndex <= classNameStartIndex) {
+            return ""; // Closing parenthesis not found or occurs before opening parenthesis
+        }
+
+        // Extract the substring enclosed in parentheses
+        String className = testInfo.substring(classNameStartIndex + 1, classNameEndIndex);
+
+        // Method name is before opening parenthesis
+        String methodName = testInfo.substring(0, classNameStartIndex);
+
+        // Concatenate class name, method name, and #
+        return className + "#" + methodName;
     }
 
     /**
