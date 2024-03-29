@@ -76,6 +76,7 @@ public class RerunMojo extends AbstractMojo {
 
             List<URL> allURLs = new ArrayList<>();
             try {
+                // Get all dependencies needed for NIODetector plugin
                 List<URL> pluginDependencies = new ArrayList<>();
                 for (Artifact artifact : pluginArtifacts) {
                     if (artifact.getFile() != null) {
@@ -83,11 +84,15 @@ public class RerunMojo extends AbstractMojo {
                     }
                 }
                 allURLs.addAll(pluginDependencies);
+
+                // Get all test dependencies for current project
                 List<String> projectTestDependenciesElements = project.getTestClasspathElements();
                 List<URL> projectTestDependencies = new ArrayList<>();
                 for (String dependency : projectTestDependenciesElements) {
                     projectTestDependencies.add(new File(dependency).toURI().toURL());
                 }
+
+                // Add system dependencies of current project
                 allURLs.addAll(projectTestDependencies);
                 List<String> projectSystemDependenciesElements = project.getSystemClasspathElements();
                 List<URL> projectSystemDependencies = new ArrayList<>();
@@ -98,6 +103,7 @@ public class RerunMojo extends AbstractMojo {
             } catch (Exception e) {
                 throw new MojoExecutionException("Error retrieving all dependent Jars", e);
             }
+            // Add test classes found in current project
             allURLs.add(testClassURL);
 
             // Create IsolatedURLClassLoader with all relevant URLs
