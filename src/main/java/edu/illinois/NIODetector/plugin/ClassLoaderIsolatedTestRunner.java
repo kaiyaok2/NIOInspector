@@ -22,19 +22,18 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Utility class for running tests in an isolated class loader.
+ * A JUnit test runner in an isolated classloader
  */
 public class ClassLoaderIsolatedTestRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(ClassLoaderIsolatedTestRunner.class);
 
     /**
-     * Constructs a ClassLoaderIsolatedTestRunner.
+     * Disallow construction at all from wrong ClassLoader
      *
-     * @throws MojoExecutionException if an error occurs during construction
+     * @throws MojoExecutionException
      */
     public ClassLoaderIsolatedTestRunner() throws MojoExecutionException {
-        // Disallow construction at all from wrong ClassLoader
         ensureLoadedInIsolatedClassLoader(this);
     }
 
@@ -42,12 +41,12 @@ public class ClassLoaderIsolatedTestRunner {
      * Runs the tests reflectively using the provided class loader.
      *
      * @param testClasses the list of test classes to run
-     * @param classLoader the class loader to use for loading test classes
-     * @param numReruns the number of times to rerun the tests
-     * @throws MojoExecutionException if an error occurs during test execution
+     * @param classLoader the class loader loaded with test classes and all dependencies
+     * @param numReruns user-configured number of times to rerun the tests
+     * @throws MojoExecutionException
      */
-    public void run_invokedReflectively(List<String> testClasses, ClassLoader classLoader, int numReruns) throws MojoExecutionException {
-        // Make sure we are not accidentally working in the system CL
+    public void runInvokedReflectively(List<String> testClasses, ClassLoader classLoader, int numReruns) throws MojoExecutionException {
+        // Make sure no elements come from other (e.g. system) classloaders
         ensureLoadedInIsolatedClassLoader(this);
 
         // Load classes
@@ -74,9 +73,9 @@ public class ClassLoaderIsolatedTestRunner {
      * Runs JUnit 4/5 tests.
      *
      * @param classes the array of test classes
-     * @param classLoader the class loader to use for running the tests
-     * @param numReruns the number of times to rerun the tests
-     * @throws MojoExecutionException if an error occurs during test execution
+     * @param classLoader the class loader loaded with test classes and all dependencies
+     * @param numReruns user-configured number of times to rerun the tests
+     * @throws MojoExecutionException
      */
     private void runJUnitTests(Class<?>[] classes, ClassLoader classLoader, int numReruns) throws MojoExecutionException {
         Thread.currentThread().setContextClassLoader(classLoader);
@@ -136,7 +135,7 @@ public class ClassLoaderIsolatedTestRunner {
             printSummary(summary);
         }
 
-        // Log final results
+        // Log final results (possible NIO tests)
         logger.info("");
         logger.info("=========================Final Results=========================");
         logger.info("");
@@ -151,6 +150,10 @@ public class ClassLoaderIsolatedTestRunner {
         
     }
 
+    /**
+     * Prints the test execution summary produced by the JUnit Vintage engine
+     * @param summary The test execution summary to logged.
+     */
     private void printSummary(TestExecutionSummary summary) {
         summary.printTo(new PrintWriter(System.out));
         summary.getFailures().forEach(failure -> {
@@ -170,6 +173,12 @@ public class ClassLoaderIsolatedTestRunner {
         }
     }
 
+    /**
+     * Convert the JUnit-Vintage-Engine-generated unique test ID to standard "class+method" format
+     *
+     * @param input The unique test ID string
+     * @return Test method name in the standard format (i.e. com.example.exampleTest#TestSomething)
+     */
     private static String extractTestMethod(String input) {
         // Find the index of the first occurrence of "[test:"
         int startIndex = input.indexOf("[test:");
@@ -183,20 +192,18 @@ public class ClassLoaderIsolatedTestRunner {
             return ""; // "]" not found or occurs before "[test:"
         }
 
-        // Extract the substring between startIndex and endIndex
+        // Extract the substring between parentheses
         String testInfo = input.substring(startIndex + "[test:".length(), endIndex);
         
+        // Extract the substring enclosed in parentheses
         int classNameStartIndex = testInfo.indexOf("(");
         if (classNameStartIndex == -1) {
-            return ""; // Opening parenthesis not found
+            return "";
         }
-
         int classNameEndIndex = testInfo.lastIndexOf(")");
         if (classNameEndIndex == -1 || classNameEndIndex <= classNameStartIndex) {
-            return ""; // Closing parenthesis not found or occurs before opening parenthesis
+            return ""; 
         }
-
-        // Extract the substring enclosed in parentheses
         String className = testInfo.substring(classNameStartIndex + 1, classNameEndIndex);
 
         // Method name is before opening parenthesis

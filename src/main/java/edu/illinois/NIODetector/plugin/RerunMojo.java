@@ -122,8 +122,8 @@ public class RerunMojo extends AbstractMojo {
             constructor.setAccessible(true);
             Object testRunner = constructor.newInstance();
     
-            // Invoke the run_invokedReflectively method reflectively
-            Method runMethod = testRunnerClass.getMethod("run_invokedReflectively", List.class, ClassLoader.class, int.class);
+            // Invoke the JUnit runner method reflectively
+            Method runMethod = testRunnerClass.getMethod("runInvokedReflectively", List.class, ClassLoader.class, int.class);
             runMethod.invoke(testRunner, testClassNames, classLoader, numReruns);
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
             throw new MojoExecutionException("Error invoking ClassLoaderIsolatedTestRunner", e);
