@@ -173,6 +173,34 @@ public class ClassLoaderIsolatedTestRunner {
         }
     }
 
+    public static String extractTestMethodAlternative(String input) {
+        // Split the Java String by "/"
+        String[] parts = input.split("/");
+
+        // Initialize class name and method name variables
+        String className = null;
+        String methodName = null;
+
+        // Iterate through each part and extract class and method names
+        for (String part : parts) {
+            if (part.startsWith("[class:")) {
+                // Extract class name
+                className = part.split("\\[class:")[1].split("]")[0];
+            } else if (part.startsWith("[method:")) {
+                // Extract method name
+                methodName = part.split("\\[method:")[1].split("]")[0];
+            }
+        }
+
+        // Concatenate class and method names with "#" separator
+        if (className != null && methodName != null) {
+            String concatenated = className + "#" + methodName;
+            return concatenated.split("\\(")[0];
+        } else {
+            return null;
+        }
+    }
+
     /**
      * Convert the JUnit-Vintage-Engine-generated unique test ID to standard "class+method" format
      *
@@ -183,9 +211,10 @@ public class ClassLoaderIsolatedTestRunner {
         // Find the index of the first occurrence of "[test:"
         int startIndex = input.indexOf("[test:");
         if (startIndex == -1) {
-            return ""; // "[test:" not found in the input
+            // if not found, then no runner presented, use an alternative parsing logic
+            return extractTestMethodAlternative(input);
         }
-        
+
         // Find the index of the last occurrence of "]"
         int endIndex = input.lastIndexOf("]");
         if (endIndex == -1 || endIndex <= startIndex) {

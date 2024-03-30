@@ -91,9 +91,9 @@ public class RerunMojo extends AbstractMojo {
                 for (String dependency : projectTestDependenciesElements) {
                     projectTestDependencies.add(new File(dependency).toURI().toURL());
                 }
-
-                // Add system dependencies of current project
                 allURLs.addAll(projectTestDependencies);
+
+                // Add system dependencies of current projec
                 List<String> projectSystemDependenciesElements = project.getSystemClasspathElements();
                 List<URL> projectSystemDependencies = new ArrayList<>();
                 for (String dependency : projectSystemDependenciesElements) {
