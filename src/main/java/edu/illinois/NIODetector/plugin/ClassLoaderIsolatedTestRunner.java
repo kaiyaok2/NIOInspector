@@ -1,10 +1,8 @@
 package edu.illinois.NIODetector.plugin;
 
 import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.logging.SystemStreamLog; 
 import org.junit.platform.launcher.Launcher;
 import org.junit.platform.launcher.core.LauncherFactory;
-import org.junit.platform.launcher.listeners.SummaryGeneratingListener;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.launcher.listeners.TestExecutionSummary;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
@@ -41,43 +39,59 @@ public class ClassLoaderIsolatedTestRunner {
      * Runs the tests reflectively using the provided class loader.
      *
      * @param testClasses the list of test classes to run
+     * @param classStringToMethodsMap the mapping between test classes and selected methods to run
      * @param classLoader the class loader loaded with test classes and all dependencies
      * @param numReruns user-configured number of times to rerun the tests
      * @throws MojoExecutionException
      */
-    public void runInvokedReflectively(List<String> testClasses, ClassLoader classLoader, int numReruns) throws MojoExecutionException {
+    public void runInvokedReflectively(List<String> testClasses, Map<String, List<String>> classStringToMethodsMap,
+        ClassLoader classLoader, int numReruns) throws MojoExecutionException {
+
         // Make sure no elements come from other (e.g. system) classloaders
         ensureLoadedInIsolatedClassLoader(this);
 
-        // Load classes
-        List<Class<?>> classesList = new ArrayList<>();
+        // Load classes and methods (if selected)
+        List<Class<?>> classesToRunAllTests = new ArrayList<>();
+        List<Class<?>> classesToRunSelectedTests = new ArrayList<>();
+        Map<Class<?>, List<String>> classToMethodsMap = new HashMap<>();
         for (int i = 0; i < testClasses.size(); i++) {
-            String test = testClasses.get(i);
+            String testClassString = testClasses.get(i);
             try {
-                Class<?> currentClass = Class.forName(test, true, classLoader);
-                classesList.add(currentClass);
+                Class<?> testClass = Class.forName(testClassString, true, classLoader);
+                if (classStringToMethodsMap.containsKey(testClassString)) {
+                    classToMethodsMap.put(testClass, classStringToMethodsMap.get(testClassString));
+                    if (!classesToRunSelectedTests.contains(testClass)) {
+                        classesToRunSelectedTests.add(testClass);
+                    }
+                } else {
+                    classesToRunAllTests.add(testClass);
+                }
             } catch (Exception | Error e) {
-                String msg = "The [" + test + "] test class is not found.";
+                String msg = "The [" + testClassString + "] test class is not found.";
                 logger.warn(msg);
                 logger.warn(e.toString());
                 continue;
             }
         }
-        Class<?>[] classes = classesList.toArray(new Class<?>[0]);
 
         // Run both JUnit 4 and 5 tests using Vintage Engine
-        runJUnitTests(classes, classLoader, numReruns);
+        runJUnitTests(classesToRunAllTests, classesToRunSelectedTests, classToMethodsMap, classLoader, numReruns);
     }
 
     /**
      * Runs JUnit 4/5 tests.
      *
-     * @param classes the array of test classes
+     * @param classesToRunAllTests the list of test classes where all methods shall be run
+     * @param classesToRunSelectedTests the array of test classes where selected methods shall be run
+     * @param classToMethodsMap map from a test class to the selected test methods to run
      * @param classLoader the class loader loaded with test classes and all dependencies
      * @param numReruns user-configured number of times to rerun the tests
      * @throws MojoExecutionException
      */
-    private void runJUnitTests(Class<?>[] classes, ClassLoader classLoader, int numReruns) throws MojoExecutionException {
+    private void runJUnitTests(List<Class<?>> classesToRunAllTests, List<Class<?>> classesToRunSelectedTests,
+        Map<Class<?>, List<String>> classToMethodsMap, ClassLoader classLoader, int numReruns) throws MojoExecutionException {
+
+        // Sanity check
         Thread.currentThread().setContextClassLoader(classLoader);
         Launcher launcher = null;
 
@@ -95,9 +109,15 @@ public class ClassLoaderIsolatedTestRunner {
         CustomSummaryGeneratingListener listener = new CustomSummaryGeneratingListener();
         launcher.registerTestExecutionListeners(listener);
 
+        // Select classes or methods to run
         LauncherDiscoveryRequestBuilder requestBuilder = LauncherDiscoveryRequestBuilder.request();
-        for (Class<?> testClass : classes) {
+        for (Class<?> testClass : classesToRunAllTests) {
             requestBuilder.selectors(DiscoverySelectors.selectClass(testClass));
+        }
+        for (Class<?> testClass : classesToRunSelectedTests) {
+            for (String method : classToMethodsMap.get(testClass)) {
+                requestBuilder.selectors(DiscoverySelectors.selectMethod(testClass, method));
+            }
         }
 
         // First Run
@@ -115,7 +135,6 @@ public class ClassLoaderIsolatedTestRunner {
             logger.info("");
             logger.info("=======================Starting Rerun #" + (i + 1) + "=========================");
             logger.info("");
-            final int iteration = i;
             launcher.execute(requestBuilder.build());
             summary = listener.getSummary();
             summary.getFailures().forEach(failure -> {

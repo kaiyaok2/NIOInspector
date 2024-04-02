@@ -10,7 +10,6 @@ import org.apache.maven.project.MavenProject;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.lang.reflect.Constructor;
@@ -18,6 +17,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Custom Maven plugin Mojo for rerunning tests.
@@ -58,11 +59,31 @@ public class RerunMojo extends AbstractMojo {
     public void execute() throws MojoExecutionException {
 
         List<String> testClassNames = new ArrayList<>();
+        Map<String, List<String>> classStringToMethodsMap = new HashMap<>();
         if (!(test == null) && !test.isEmpty()) {
             // Parse the test parameter and extract class and method names
-            String[] tests = test.split(",");
-            for (String testEntry : tests) {
-                testClassNames.add(testEntry.trim());
+            String[] testClasses = test.split(",");
+            for (String testClassOrMethod : testClasses) {
+                if (testClassOrMethod.contains("#")) {
+                    // Method name specified
+                    String[] parts = testClassOrMethod.split("#");
+                    String testClass = parts[0];
+                    String testMethod = parts[1];
+
+                    // Bind test methods to classes
+                    List<String> testsInTestClass = new ArrayList<>();
+                    if (classStringToMethodsMap.containsKey(testClass)) {
+                        testsInTestClass = classStringToMethodsMap.get(testClass);
+                    }
+                    testsInTestClass.add(testMethod.trim());
+                    classStringToMethodsMap.put(testClass, testsInTestClass);
+                    if (!testClassNames.contains(testClassOrMethod)) {
+                        testClassNames.add(testClass);
+                    }
+                } else {
+                    // Only class name specified
+                    testClassNames.add(testClassOrMethod.trim());
+                }
             }
         } else {
             // If test parameter is not provided, find all test classes
@@ -93,13 +114,13 @@ public class RerunMojo extends AbstractMojo {
                 }
                 allURLs.addAll(projectTestDependencies);
 
-                // Add system dependencies of current projec
-                List<String> projectSystemDependenciesElements = project.getSystemClasspathElements();
-                List<URL> projectSystemDependencies = new ArrayList<>();
-                for (String dependency : projectSystemDependenciesElements) {
-                    projectSystemDependencies.add(new File(dependency).toURI().toURL());
+                // Add runtime dependencies of current project
+                List<String> projectRuntimeDependenciesElements = project.getRuntimeClasspathElements();
+                List<URL> projectRuntimeDependencies = new ArrayList<>();
+                for (String dependency : projectRuntimeDependenciesElements) {
+                    projectRuntimeDependencies.add(new File(dependency).toURI().toURL());
                 }
-                allURLs.addAll(projectSystemDependencies);
+                allURLs.addAll(projectRuntimeDependencies);
             } catch (Exception e) {
                 throw new MojoExecutionException("Error retrieving all dependent Jars", e);
             }
@@ -123,8 +144,8 @@ public class RerunMojo extends AbstractMojo {
             Object testRunner = constructor.newInstance();
     
             // Invoke the JUnit runner method reflectively
-            Method runMethod = testRunnerClass.getMethod("runInvokedReflectively", List.class, ClassLoader.class, int.class);
-            runMethod.invoke(testRunner, testClassNames, classLoader, numReruns);
+            Method runMethod = testRunnerClass.getMethod("runInvokedReflectively", List.class, Map.class, ClassLoader.class, int.class);
+            runMethod.invoke(testRunner, testClassNames, classStringToMethodsMap, classLoader, numReruns);
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
             throw new MojoExecutionException("Error invoking ClassLoaderIsolatedTestRunner", e);
         }
