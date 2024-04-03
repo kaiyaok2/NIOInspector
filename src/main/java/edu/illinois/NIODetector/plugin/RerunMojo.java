@@ -93,7 +93,7 @@ public class RerunMojo extends AbstractMojo {
         URLClassLoader classLoader = null;
         try {
             // Convert the paths to URLs
-            URL testClassURL = new File(project.getBuild().getTestOutputDirectory()).toURI().toURL();
+            URL testClassesURL = new File(project.getBuild().getTestOutputDirectory()).toURI().toURL();
 
             List<URL> allURLs = new ArrayList<>();
             try {
@@ -125,7 +125,7 @@ public class RerunMojo extends AbstractMojo {
                 throw new MojoExecutionException("Error retrieving all dependent Jars", e);
             }
             // Add test classes found in current project
-            allURLs.add(testClassURL);
+            allURLs.add(testClassesURL);
 
             // Create IsolatedURLClassLoader with all relevant URLs
             classLoader = new IsolatedURLClassLoader(allURLs.toArray(new URL[0]));

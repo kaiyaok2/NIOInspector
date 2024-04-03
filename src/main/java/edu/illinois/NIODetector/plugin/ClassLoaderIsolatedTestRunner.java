@@ -162,8 +162,15 @@ public class ClassLoaderIsolatedTestRunner {
             logger.info("No NIO Tests Found");
         } else {
             for (Map.Entry<String, Integer> entry : NIOtests.entrySet()) {
-                logger.error(entry.getKey() + " (passed in the initial run but failed in " +
-                    entry.getValue() + " out of " + numReruns + " reruns)");
+                if (entry.getValue() < numReruns) {
+                    logger.warn("A Non-deterministic Flaky Test Found:");
+                    logger.warn(entry.getKey() + " (passed in the initial run but failed in " +
+                        entry.getValue() + " out of " + numReruns + " reruns)");
+                } else {
+                    logger.error("A Possible NIO Test Found:");
+                    logger.error(entry.getKey() + " (passed in the initial run but failed in " +
+                        entry.getValue() + " out of " + numReruns + " reruns)");
+                }
             }
         }
         

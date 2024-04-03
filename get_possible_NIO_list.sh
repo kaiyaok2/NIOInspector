@@ -13,7 +13,7 @@ log_file="$1"
 start_line=$(grep -n "\[INFO\] =========================Final Results=========================" "$log_file" | cut -d':' -f1)
 
 # Find the second line after the start line
-target_line=$((start_line + 2))
+target_line=$((start_line + 3))
 
 # Check if the target line exists
 total_lines=$(wc -l < "$log_file")
