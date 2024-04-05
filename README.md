@@ -31,7 +31,7 @@ Use (NIOFixer - Command-line):
 ============
 
     mvn edu.illinois:NIODetector:rerun > output.log
-    ./find_all_buggy_testclasses.sh output.log
+    mvn edu.illinois:NIODetector:reduceBuggyTestCode -DlogFile="output.log"
     ./extract_error_stacktrace.sh output.log
     python3 GPT_NIO_fixer.py ${your api key} ${optional additional prompt} ${max token for generation}
 
