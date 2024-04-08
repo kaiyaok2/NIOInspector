@@ -162,6 +162,7 @@ public class ClassLoaderIsolatedTestRunner {
             logger.info("No NIO Tests Found");
         } else {
             for (Map.Entry<String, Integer> entry : NIOtests.entrySet()) {
+                // Check if a test is not failing in all reruns
                 if (entry.getValue() < numReruns) {
                     logger.warn("A Non-deterministic Flaky Test Found:");
                     logger.warn(entry.getKey() + " (passed in the initial run but failed in " +
@@ -183,7 +184,7 @@ public class ClassLoaderIsolatedTestRunner {
     private void printSummary(TestExecutionSummary summary) {
         summary.printTo(new PrintWriter(System.out));
         summary.getFailures().forEach(failure -> {
-            logger.warn("Failure in container: " + failure.getTestIdentifier().getDisplayName());
+            logger.warn("Failing Test: " + extractTestMethod(failure.getTestIdentifier().getUniqueId()));
             Throwable exception = failure.getException();
             if (exception != null) {
                 logger.warn("Failure message: " + exception.getMessage());
@@ -191,39 +192,11 @@ public class ClassLoaderIsolatedTestRunner {
             }
         });
         if (summary.getTestsFailedCount() > 0) {
-            logger.warn("Failed tests:");
+            logger.warn("All Failed tests:");
             for (TestExecutionSummary.Failure failure : summary.getFailures()) {
                 TestIdentifier failedTest = failure.getTestIdentifier();
                 System.out.println(failedTest.getDisplayName() + ": " + failedTest.getUniqueId());
             }
-        }
-    }
-
-    public static String extractTestMethodAlternative(String input) {
-        // Split the Java String by "/"
-        String[] parts = input.split("/");
-
-        // Initialize class name and method name variables
-        String className = null;
-        String methodName = null;
-
-        // Iterate through each part and extract class and method names
-        for (String part : parts) {
-            if (part.startsWith("[class:")) {
-                // Extract class name
-                className = part.split("\\[class:")[1].split("]")[0];
-            } else if (part.startsWith("[method:")) {
-                // Extract method name
-                methodName = part.split("\\[method:")[1].split("]")[0];
-            }
-        }
-
-        // Concatenate class and method names with "#" separator
-        if (className != null && methodName != null) {
-            String concatenated = className + "#" + methodName;
-            return concatenated.split("\\(")[0];
-        } else {
-            return null;
         }
     }
 
@@ -237,7 +210,7 @@ public class ClassLoaderIsolatedTestRunner {
         // Find the index of the first occurrence of "[test:"
         int startIndex = input.indexOf("[test:");
         if (startIndex == -1) {
-            // if not found, then no runner presented, use an alternative parsing logic
+            // if not found, then no runner included, use an alternative parsing logic
             return extractTestMethodAlternative(input);
         }
 
@@ -266,6 +239,36 @@ public class ClassLoaderIsolatedTestRunner {
 
         // Concatenate class name, method name, and #
         return className + "#" + methodName;
+    }
+
+    /**
+     * Convert test ID to "class+method" format when runner not included
+     *
+     * @param input The unique test ID string
+     * @return Test method name in the standard format (i.e. com.example.exampleTest#TestSomething)
+     */
+    public static String extractTestMethodAlternative(String input) {
+        String[] parts = input.split("/");
+
+        String className = null;
+        String methodName = null;
+
+        // Extract class and method names
+        for (String part : parts) {
+            if (part.startsWith("[class:")) {
+                className = part.split("\\[class:")[1].split("]")[0];
+            } else if (part.startsWith("[method:")) {
+                methodName = part.split("\\[method:")[1].split("]")[0];
+            }
+        }
+
+        // Concatenate class and method names with "#" separator
+        if (className != null && methodName != null) {
+            String concatenated = className + "#" + methodName;
+            return concatenated.split("\\(")[0];
+        } else {
+            return null;
+        }
     }
 
     /**

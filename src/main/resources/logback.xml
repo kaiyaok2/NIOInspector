@@ -1,13 +1,29 @@
 <configuration>
+
+    <!-- Console appender with ANSI encoder -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>[%highlight(%-4level)] %msg%n%throwable</pattern>
+        <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+            <layout class="ch.qos.logback.classic.PatternLayout">
+                <pattern>[%highlight(%-4level)] %msg%n%throwable</pattern>
+            </layout>
+            <immediateFlush>true</immediateFlush>
+        </encoder>
+    </appender>
+
+    <!-- Custom file appender with plain text encoder -->
+    <appender name="CUSTOM_FILE" class="edu.illinois.NIODetector.plugin.CustomTimeBasedFileAppender">
+        <file>.NIODetector/current-time/rerun-results</file>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>[%-4level] %msg%n%throwable</pattern>
         </encoder>
     </appender>
 
     <root level="INFO">
+        <!-- Reference console appender -->
         <appender-ref ref="CONSOLE" />
+        <!-- Reference custom file appender -->
+        <appender-ref ref="CUSTOM_FILE" />
     </root>
-</configuration>
 
+</configuration>
 

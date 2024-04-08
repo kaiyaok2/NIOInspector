@@ -1,7 +1,7 @@
-
 package edu.illinois.NIODetector.plugin;
 
 import org.apache.maven.plugin.AbstractMojo;
+import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -11,29 +11,71 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.text.SimpleDateFormat;
 
+/**
+ * Mojo to obtain minimum source code for a possible NIO test
+ */
 @Mojo(name = "reduceBuggyTestCode", defaultPhase = LifecyclePhase.INITIALIZE)
 public class ReduceBuggyTestCodeMojo extends AbstractMojo {
 
-    @Parameter(property = "logFile", required = true)
+    /**
+     * Log file produced by running the Rerun Mojo
+     */
+    @Parameter(property = "logFile")
     private String logFilePath;
 
+    /**
+     * Directory to test source files. (i.e. src/test/...)
+     */
     @Parameter(property = "testSourceDirectory", defaultValue = "${project.build.testSourceDirectory}")
     private File testSourceDirectory;
 
-    public void execute() {
-        File logFile = new File(logFilePath);
-        if (logFile == null || !logFile.exists()) {
-            getLog().error("Log file not found or not provided.");
-            return;
+    private static final String LOG_DIRECTORY = ".NIODetector";
+
+    /**
+     * Find source test code w.r.t each possible NIO and reduce it
+     */
+    public void execute() throws MojoExecutionException {
+        File logFile = null;
+        // Log file not provided; default to file produced by most recent run
+        if (logFilePath == null) {
+            getLog().warn("Log not provided; uses most recent log.");
+
+            File logDirectory = new File(LOG_DIRECTORY);
+
+            // List all time-base named subdirectories in the .NIODetector directory
+            File[] subdirectories = logDirectory.listFiles(File::isDirectory);
+
+            if (subdirectories != null) {
+                // Sort subdirectories by timestamp (descending order)
+                Arrays.sort(subdirectories, Comparator.comparingLong(this::getTimestampFromDirectory).reversed());
+
+                // Get the most recent directory
+                File mostRecentDirectory = subdirectories[0];
+
+                // Find the rerun-results.log file in the most recent directory
+                Optional<File> rerunResultsLogFileOptional = Arrays.stream(mostRecentDirectory.listFiles())
+                        .filter(file -> file.getName().equals("rerun-results.log"))
+                        .findFirst();
+
+                // Cast Optional<File> to File or throw exception if casting fails
+                logFile = rerunResultsLogFileOptional.orElseThrow(() ->
+                        new MojoExecutionException("Failed to find a recent rerun-results.log file"));
+            }
+        } else {
+            logFile = new File(logFilePath);
         }
 
         List<String> errorStrings = getErrorStrings(logFile);
 
-        // Check if there are any error strings
         if (errorStrings.isEmpty()) {
             getLog().info("No error strings found");
             return;
@@ -44,6 +86,23 @@ public class ReduceBuggyTestCodeMojo extends AbstractMojo {
         }
     }
 
+    private long getTimestampFromDirectory(File directory) {
+        try {
+            String timeBasedFileName = directory.getName();
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss");
+            Date creationTime = dateFormat.parse(timeBasedFileName);
+            return creationTime.getTime();
+        } catch (Exception e) {
+            getLog().error("Error parsing timestamp for directory: " + directory.getPath(), e);
+            return 0;
+        }
+    }
+
+    /**
+     * Parses the rerun log and extracts string representation of possible NIO methods
+     * @param logFile The log file to parse.
+     * @return A list of error strings.
+     */
     private List<String> getErrorStrings(File logFile) {
         List<String> errorStrings = new ArrayList<>();
 
@@ -67,7 +126,6 @@ public class ReduceBuggyTestCodeMojo extends AbstractMojo {
 
                 // Read the content of the target line
                 line = reader.readLine();
-                System.out.println(line);
                 while (line != null && line.startsWith("[ERROR] ")) {
                     // Extract the error string
                     String errorString = line.substring("[ERROR] ".length()).split(" \\(passed in the initial run")[0];
@@ -81,6 +139,12 @@ public class ReduceBuggyTestCodeMojo extends AbstractMojo {
         return errorStrings;
     }
 
+    /**
+     * Implementation of a test method may be in a parent class - finds it if necessary
+     * @param parentClass The name of the parent class.
+     * @param directory The directory to search in.
+     * @return File object w.r.t the parent test class or null if not found.
+     */
     private File findParentTestClassFile(String parentClass, File directory) {
         if (directory == null || !directory.isDirectory()) {
             return null; // Invalid directory
@@ -100,9 +164,13 @@ public class ReduceBuggyTestCodeMojo extends AbstractMojo {
             }
         }
 
-        return null; // File not found
+        return null; // Parent class not found in fs
     }
 
+    /**
+     * Writes the reduced test file w.r.t one possible NIO test
+     * @param errorString The string containing class and method names.
+     */
     private void writeReducedTestFile(String errorString) {
         String[] errorParts = errorString.split("#");
         if (errorParts.length != 2) {
@@ -121,6 +189,12 @@ public class ReduceBuggyTestCodeMojo extends AbstractMojo {
         writeBuggyJavaFile(className, methodName, testFile);
     }
 
+    /**
+     * Helper of `writeReducedTestFile()` - reduce test code and write to output
+     * @param className The name of the test class.
+     * @param methodName The name of the test method.
+     * @param testFile The test file containing the method.
+     */
     private void writeBuggyJavaFile(String className, String methodName, File testFile) {
         try (BufferedReader reader = new BufferedReader(new FileReader(testFile))) {
             StringBuilder testContent = new StringBuilder();
@@ -180,6 +254,7 @@ public class ReduceBuggyTestCodeMojo extends AbstractMojo {
                 }
             }
 
+            // Check if implementation available in parent classes
             if (!testFound) {
                 if (hasParentClass) {
                     File parentClassFile = findParentTestClassFile(parentClass, testSourceDirectory);
@@ -190,10 +265,7 @@ public class ReduceBuggyTestCodeMojo extends AbstractMojo {
                 return;
             }
 
-            System.out.println("########################################");
-            System.out.println(testContent);
-            System.out.println("########################################");
-
+            // Write reduced test source code
             String buggyJavaFileName = className + ".buggyjava";
             try (FileWriter writer = new FileWriter(new File(buggyJavaFileName))) {
                 writer.write(testContent.toString().replaceAll("(?m)^\\s*$[\r\n]*", ""));
@@ -206,3 +278,4 @@ public class ReduceBuggyTestCodeMojo extends AbstractMojo {
         }
     }
 }
+
