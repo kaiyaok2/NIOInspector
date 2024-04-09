@@ -6,6 +6,7 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -21,10 +22,13 @@ import java.util.regex.Pattern;
 import java.text.SimpleDateFormat;
 
 /**
- * Mojo to obtain minimum source code for a possible NIO test
+ * Mojo to collect three pieces of information from a previous rerun:
+ * 1. A list of possible NIO tests.
+ * 2. The stacktrace of the first rerun of each possible NIO test.
+ * 3. The reduced method source code of each possible NIO test.
  */
-@Mojo(name = "reduceBuggyTestCode", defaultPhase = LifecyclePhase.INITIALIZE)
-public class ReduceBuggyTestCodeMojo extends AbstractMojo {
+@Mojo(name = "collectTestInfo", defaultPhase = LifecyclePhase.INITIALIZE)
+public class CollectTestInfoMojo extends AbstractMojo {
 
     /**
      * Log file produced by running the Rerun Mojo
@@ -74,18 +78,114 @@ public class ReduceBuggyTestCodeMojo extends AbstractMojo {
             logFile = new File(logFilePath);
         }
 
-        List<String> errorStrings = getErrorStrings(logFile);
+        String parentDirectory = logFile.getParent();
 
-        if (errorStrings.isEmpty()) {
+        // Get a list of all possible NIO tests
+        List<String> possibleNIOTests = getPossibleNIOTestss(logFile);
+        if (possibleNIOTests.isEmpty()) {
             getLog().info("No error strings found");
             return;
         }
 
-        for (String errorString : errorStrings) {
-            writeReducedTestFile(errorString);
+        // Write the list of possible NIO tests
+        try (FileWriter writer = new FileWriter(new File(parentDirectory, "possible-NIO-list.txt"))) {
+            for (String line : possibleNIOTests) {
+                writer.write(line + System.lineSeparator());
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        for (String possibleNIOTest : possibleNIOTests) {
+            // Write reduced test code at method granularity
+            writeReducedTestFile(possibleNIOTest, parentDirectory);
+
+            // Write stacktrace of the failure in the first rerun
+            writeStackTrace(possibleNIOTest, parentDirectory, logFile);
         }
     }
 
+    /**
+     * Write the stack trace of a possible NIO test in its first rerun
+     * @param possibleNIOTest The name of the test to write stack trace for
+     * @param parentDirectory The directory to store the stack trace written
+     * @param logFile The log file produced by running the Rerun Mojo
+     */
+    public void writeStackTrace(String possibleNIOTest, String parentDirectory, File logFile) throws MojoExecutionException {
+        try (BufferedReader reader = new BufferedReader(new FileReader(logFile))) {
+            String line;
+            int startLine = -1;
+            boolean inFirstRerun = false;
+            int lineNum = 0;
+            Pattern firstRerunStartPattern = Pattern.compile("\\[INFO\\] =======================Starting Rerun #1=========================");
+            Pattern failingTestReportPattern = Pattern.compile("\\[WARN\\] Failing Test: " + Pattern.quote(possibleNIOTest));
+            Pattern failureMessagePattern = Pattern.compile("Failure message:");
+            String NIOTestName = possibleNIOTest.replace("#", ".");
+            // Find the stacktrace of the possible NIOTest in the first rerun.
+            while ((line = reader.readLine()) != null) {
+                lineNum++;
+                if (!inFirstRerun) {
+                    Matcher firstRerunStartMatcher = firstRerunStartPattern.matcher(line);
+                    if (firstRerunStartMatcher.find()) {
+                        inFirstRerun = true;
+                    }
+                } else {
+                    Matcher failingTestReportMatcher = failingTestReportPattern.matcher(line);
+                    if (failingTestReportMatcher.find()) {
+                        startLine = lineNum + 1;
+                    }
+                }
+                Matcher failureMatcher = failureMessagePattern.matcher(line);
+                if (failureMatcher.find() && startLine != -1) {
+                    extractStackTrace(startLine, parentDirectory, logFile, NIOTestName);
+                    return;
+                }
+            }
+            getLog().info("Failed to extract log");
+        } catch (IOException e) {
+            throw new MojoExecutionException("An error occurred while processing log file.", e);
+        }
+    }
+
+    /**
+     * Helper of `writeStackTrace()` to extract stacktrace chunk from the log, given start line
+     * @param startLine Line number of the start line of the stack trace chunk
+     * @param parentDirectory The directory to store the stack trace written
+     * @param logFile The log file produced by running the Rerun Mojo
+     * @param NIOTestName The name of the NIO method to be used as part of file name of the written stack trace
+     */
+    private void extractStackTrace(int startLine, String parentDirectory, File logFile, String NIOTestName) throws IOException {
+        File subDirectory = new File(parentDirectory + File.separator + NIOTestName);
+        if (!subDirectory.exists()) {
+            subDirectory.mkdir();
+        }
+        try (BufferedReader reader = new BufferedReader(new FileReader(logFile));
+             BufferedWriter writer = new BufferedWriter(new FileWriter(new File(subDirectory, "stacktrace")))) {
+            String line;
+            int lineNum = 0;
+            boolean startedWriting = false;
+            // The stack trace chunk does not start with a level header (i.e. "[INFO]"")
+            while ((line = reader.readLine()) != null) {
+                lineNum++;
+                if (lineNum >= startLine) {
+                    if (!line.startsWith("[WARN]") && !line.startsWith("[INFO]") && !line.startsWith("[ERROR]")) {
+                        startedWriting = true;
+                        writer.write(line);
+                        writer.newLine();
+                    } else if (startedWriting) {
+                        break;
+                    }
+                }
+            }
+            getLog().info("Extracted log saved to extracted_stacktrace_" + logFile.getName());
+        }
+    }
+
+    /**
+     * Get time stamp from the time-based directory name
+     * @param directory The directory with time-based name
+     * @return A comparable time stamp
+     */
     private long getTimestampFromDirectory(File directory) {
         try {
             String timeBasedFileName = directory.getName();
@@ -103,8 +203,8 @@ public class ReduceBuggyTestCodeMojo extends AbstractMojo {
      * @param logFile The log file to parse.
      * @return A list of error strings.
      */
-    private List<String> getErrorStrings(File logFile) {
-        List<String> errorStrings = new ArrayList<>();
+    private List<String> getPossibleNIOTestss(File logFile) {
+        List<String> possibleNIOTestss = new ArrayList<>();
 
         try (BufferedReader reader = new BufferedReader(new FileReader(logFile))) {
             String line;
@@ -128,15 +228,15 @@ public class ReduceBuggyTestCodeMojo extends AbstractMojo {
                 line = reader.readLine();
                 while (line != null && line.startsWith("[ERROR] ")) {
                     // Extract the error string
-                    String errorString = line.substring("[ERROR] ".length()).split(" \\(passed in the initial run")[0];
-                    errorStrings.add(errorString);
+                    String possibleNIOTests = line.substring("[ERROR] ".length()).split(" \\(passed in the initial run")[0];
+                    possibleNIOTestss.add(possibleNIOTests);
                     line = reader.readLine();
                 }
             }
         } catch (IOException e) {
             getLog().error("Error reading log file: " + logFile.getAbsolutePath(), e);
         }
-        return errorStrings;
+        return possibleNIOTestss;
     }
 
     /**
@@ -152,7 +252,6 @@ public class ReduceBuggyTestCodeMojo extends AbstractMojo {
 
         // Search for the file recursively
         for (File file : directory.listFiles()) {
-            System.out.println(file);
             if (file.isDirectory()) {
                 // Recursively search in subdirectories
                 File result = findParentTestClassFile(parentClass, file);
@@ -169,12 +268,13 @@ public class ReduceBuggyTestCodeMojo extends AbstractMojo {
 
     /**
      * Writes the reduced test file w.r.t one possible NIO test
-     * @param errorString The string containing class and method names.
+     * @param possibleNIOTests The string containing class and method names.
+     * @param parentDirectory The parent directory of the files to be written.
      */
-    private void writeReducedTestFile(String errorString) {
-        String[] errorParts = errorString.split("#");
+    private void writeReducedTestFile(String possibleNIOTests, String parentDirectory) {
+        String[] errorParts = possibleNIOTests.split("#");
         if (errorParts.length != 2) {
-            getLog().warn("Invalid error string format: " + errorString);
+            getLog().warn("Invalid error string format: " + possibleNIOTests);
             return;
         }
 
@@ -186,16 +286,17 @@ public class ReduceBuggyTestCodeMojo extends AbstractMojo {
             getLog().warn("Test file not found: " + testFile.getAbsolutePath());
             return;
         }
-        writeBuggyJavaFile(className, methodName, testFile);
+        writeBuggyJavaFile(className, methodName, testFile, parentDirectory);
     }
 
     /**
      * Helper of `writeReducedTestFile()` - reduce test code and write to output
      * @param className The name of the test class.
      * @param methodName The name of the test method.
-     * @param testFile The test file containing the method.
+     * @param testFile The test file containing the source code of the test method.
+     * @param parentDirectory The parent directory of the files to be written.
      */
-    private void writeBuggyJavaFile(String className, String methodName, File testFile) {
+    private void writeBuggyJavaFile(String className, String methodName, File testFile, String parentDirectory) {
         try (BufferedReader reader = new BufferedReader(new FileReader(testFile))) {
             StringBuilder testContent = new StringBuilder();
             String line;
@@ -258,7 +359,7 @@ public class ReduceBuggyTestCodeMojo extends AbstractMojo {
             if (!testFound) {
                 if (hasParentClass) {
                     File parentClassFile = findParentTestClassFile(parentClass, testSourceDirectory);
-                    writeBuggyJavaFile(className, methodName, parentClassFile);
+                    writeBuggyJavaFile(className, methodName, parentClassFile, parentDirectory);
                     return;
                 }
                 getLog().warn("Test method not found: " + methodName + " in " + className);
@@ -266,16 +367,18 @@ public class ReduceBuggyTestCodeMojo extends AbstractMojo {
             }
 
             // Write reduced test source code
-            String buggyJavaFileName = className + ".buggyjava";
-            try (FileWriter writer = new FileWriter(new File(buggyJavaFileName))) {
+            File subDirectory = new File(parentDirectory + File.separator + className + "." + methodName);
+            if (!subDirectory.exists()) {
+                subDirectory.mkdir();
+            }
+            try (FileWriter writer = new FileWriter(new File(subDirectory, "buggyTestMethod"))) {
                 writer.write(testContent.toString().replaceAll("(?m)^\\s*$[\r\n]*", ""));
-                getLog().info("Buggy Java file written to: " + buggyJavaFileName);
+                getLog().info("Reduced test source code written to: " + subDirectory);
             } catch (IOException e) {
-                getLog().error("Error writing to file: " + buggyJavaFileName, e);
+                getLog().error("Error writing reduced test source code: ", e);
             }
         } catch (IOException e) {
             getLog().error("Error reading file: " + testFile.getAbsolutePath(), e);
         }
     }
 }
-

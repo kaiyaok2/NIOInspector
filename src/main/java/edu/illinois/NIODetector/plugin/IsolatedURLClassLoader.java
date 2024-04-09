@@ -19,4 +19,3 @@ public class IsolatedURLClassLoader extends URLClassLoader {
         super(urls, ClassLoader.getPlatformClassLoader());
     }
 }
-

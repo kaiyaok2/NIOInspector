@@ -48,4 +48,3 @@ public class CleanMojo extends AbstractMojo {
         directory.delete();
     }
 }
-

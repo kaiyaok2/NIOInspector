@@ -187,15 +187,14 @@ public class ClassLoaderIsolatedTestRunner {
             logger.warn("Failing Test: " + extractTestMethod(failure.getTestIdentifier().getUniqueId()));
             Throwable exception = failure.getException();
             if (exception != null) {
-                logger.warn("Failure message: " + exception.getMessage());
-                exception.printStackTrace(System.out);
+                logger.warn("Failure message: ", exception);
             }
         });
         if (summary.getTestsFailedCount() > 0) {
             logger.warn("All Failed tests:");
             for (TestExecutionSummary.Failure failure : summary.getFailures()) {
                 TestIdentifier failedTest = failure.getTestIdentifier();
-                System.out.println(failedTest.getDisplayName() + ": " + failedTest.getUniqueId());
+                logger.warn(failedTest.getDisplayName() + ": " + failedTest.getUniqueId());
             }
         }
     }
@@ -288,5 +287,3 @@ public class ClassLoaderIsolatedTestRunner {
         }
     }
 }
-
-
