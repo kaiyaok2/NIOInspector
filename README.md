@@ -10,7 +10,6 @@ Prerequisites:
     - Java 9 ~ 21 (NIODetector).
     - Maven 3.5+ (NIODetector).
     - Python 3.0+ (NIOFixer).
-    - Linux / Mac / Windows Subsystem for Linux (NIOFixer).
 
 
 Build (NIODetector):
@@ -30,8 +29,6 @@ Run the following command in the root directory of the target project after inst
 Use (NIOFixer - Command-line):
 ============
 
-    mvn edu.illinois:NIODetector:rerun > output.log
-    mvn edu.illinois:NIODetector:reduceBuggyTestCode -DlogFile="output.log"
-    ./extract_error_stacktrace.sh output.log
-    python3 GPT_NIO_fixer.py ${your api key} ${optional additional prompt} ${max token for generation}
+    mvn edu.illinois:NIODetector:collectTestInfo
+    python3 GPT_NIO_fixer.py ${your api key} ${max token for generation} ${optional additional prompt}
 
