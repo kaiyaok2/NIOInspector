@@ -67,9 +67,10 @@ public class ClassLoaderIsolatedTestRunner {
                     classesToRunAllTests.add(testClass);
                 }
             } catch (Exception | Error e) {
-                String msg = "The [" + testClassString + "] test class is not found.";
+                String msg = "The [" + testClassString + "] test class is not found or failed to initialize.";
                 logger.warn(msg);
                 logger.warn(e.toString());
+                e.printStackTrace();
                 continue;
             }
         }

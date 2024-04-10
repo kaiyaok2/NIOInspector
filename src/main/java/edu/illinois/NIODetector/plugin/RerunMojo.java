@@ -1,12 +1,17 @@
 package edu.illinois.NIODetector.plugin;
 
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.model.Plugin;
+import org.apache.maven.model.PluginExecution;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.project.MavenProject;
+
+import org.codehaus.plexus.util.xml.Xpp3Dom;
+import org.w3c.dom.NodeList;
 
 import java.io.File;
 import java.io.IOException;
@@ -19,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Custom Maven plugin Mojo for rerunning tests.
@@ -172,17 +178,49 @@ public class RerunMojo extends AbstractMojo {
      */
     private void findTestClassesRecursive(File directory, List<String> testClassNames, String packageName) {
         File[] files = directory.listFiles();
+        List<String> excludePatterns = parseSurefireExcludes(project);
+        List<Pattern> compiledExcludePatterns = new ArrayList<>();
+        for (String pattern : excludePatterns) {
+            String excludeRegex = pattern.replace("/", "\\.").replace(".java", "").replace("*", ".*");
+            compiledExcludePatterns.add(Pattern.compile(excludeRegex));
+        }
         if (files != null) {
             for (File file : files) {
                 if (file.isDirectory()) {
                     findTestClassesRecursive(file, testClassNames, packageName + file.getName() + ".");
                 } else if (file.getName().endsWith(".class")) {
                     String className = packageName + file.getName().replace(".class", "").replace(File.separator, ".");
-                    if (!className.contains("Abstract")) {
-                        testClassNames.add(className);
+                    for (Pattern pattern : compiledExcludePatterns) {
+                        if (!pattern.matcher(className).matches()) {
+                            System.out.println("+++++++++++++++++++++++++++++++++");
+                            System.out.println(pattern);
+                            System.out.println(pattern.matcher("src.AbstractTest.java").matches());
+                            System.out.println("+++++++++++++++++++++++++++++++++");
+                            testClassNames.add(className);
+                        }
                     }
                 }
             }
         }
+    }
+
+    public static List<String> parseSurefireExcludes(MavenProject project) {
+        List<String> excludedList = new ArrayList<>();
+        Plugin surefirePlugin = project.getPlugin("org.apache.maven.plugins:maven-surefire-plugin");
+        if (surefirePlugin != null) {
+            for (PluginExecution execution : surefirePlugin.getExecutions()) {
+                Xpp3Dom configuration = (Xpp3Dom) execution.getConfiguration();
+                if (configuration != null) {
+                    Xpp3Dom excludesNode = configuration.getChild("excludes");
+                    if (excludesNode != null) {
+                        for (Xpp3Dom excludeNode : excludesNode.getChildren("exclude")) {
+                            String excludePattern = excludeNode.getValue();
+                            excludedList.add(excludePattern);
+                        }
+                    }
+                }
+            }
+        }
+        return excludedList;
     }
 }
