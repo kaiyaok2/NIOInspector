@@ -30,5 +30,6 @@ Use (NIOFixer - Command-line):
 ============
 
     mvn edu.illinois:NIODetector:collectTestInfo
+    mvn edu.illinois:NIODetector:downloadFixer
     python3 GPT_NIO_fixer.py ${your api key} ${max token for generation} ${optional additional prompt}
 
