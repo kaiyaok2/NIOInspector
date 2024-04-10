@@ -17,7 +17,7 @@ def get_test_info(cur_test_info_directory):
 
 client = OpenAI(api_key=sys.argv[1])
 
-def generate_text(extra_prompt_text, max_tokens, buggy_java_test, stacktrace):
+def generate_text(extra_prompt_text, max_tokens, buggy_java_test, stacktrace, cur_test_info_directory):
     prompt = extra_prompt_text +\
              "The test always passes at the first time but fails in all subsequent runs in the same JVM. " +\
              "In other words, the test has side effects and “self-pollutes” the state shared among test runs," +\
@@ -36,7 +36,8 @@ def generate_text(extra_prompt_text, max_tokens, buggy_java_test, stacktrace):
                 max_tokens=max_tokens)
     # Print the generated text
     print(response.choices[0].message)
-    with open("patch.txt", "w") as text_file:
+    patch_path = os.path.join(cur_test_info_directory, "patch.txt")
+    with open(patch_path, "w") as text_file:
         text_file.write(response.choices[0].message.content.strip())
 
 
@@ -97,7 +98,7 @@ if __name__ == "__main__":
                     cur_test = line.strip().replace("#", ".")
                     cur_test_info_directory = os.path.join(subdirectory, cur_test)
                     reduced_buggy_test_code, stacktrace = get_test_info(cur_test_info_directory)
-                    generate_text(extra_prompt_text, max_tokens, reduced_buggy_test_code, stacktrace)
+                    generate_text(extra_prompt_text, max_tokens, reduced_buggy_test_code, stacktrace, cur_test_info_directory)
         else:
             print("possible-NIO-list.txt does not exist in the subdirectory.")
     else:
