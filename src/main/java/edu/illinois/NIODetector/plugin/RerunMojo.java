@@ -178,7 +178,9 @@ public class RerunMojo extends AbstractMojo {
                     findTestClassesRecursive(file, testClassNames, packageName + file.getName() + ".");
                 } else if (file.getName().endsWith(".class")) {
                     String className = packageName + file.getName().replace(".class", "").replace(File.separator, ".");
-                    testClassNames.add(className);
+                    if (!className.contains("Abstract")) {
+                        testClassNames.add(className);
+                    }
                 }
             }
         }

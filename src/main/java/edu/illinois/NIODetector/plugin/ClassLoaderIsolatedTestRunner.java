@@ -74,7 +74,7 @@ public class ClassLoaderIsolatedTestRunner {
             }
         }
 
-        // Run both JUnit 4 and 5 tests using Vintage Engine
+        // Run JUnit 4 or 5 tests using either Jupiter or Vintage Engine
         runJUnitTests(classesToRunAllTests, classesToRunSelectedTests, classToMethodsMap, classLoader, numReruns);
     }
 
@@ -178,7 +178,7 @@ public class ClassLoaderIsolatedTestRunner {
     }
 
     /**
-     * Prints the test execution summary produced by the JUnit Vintage engine
+     * Prints the test execution summary produced by the JUnit Jupiter / Vintage engine
      * @param summary The test execution summary to logged.
      */
     private void printSummary(TestExecutionSummary summary) {
