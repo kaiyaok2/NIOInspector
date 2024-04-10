@@ -181,7 +181,8 @@ public class RerunMojo extends AbstractMojo {
         List<String> excludePatterns = parseSurefireExcludes(project);
         List<Pattern> compiledExcludePatterns = new ArrayList<>();
         for (String pattern : excludePatterns) {
-            String excludeRegex = pattern.replace("/", "\\.").replace(".java", "").replace("*", ".*");
+            String excludeRegex = pattern.replace("/", "\\.").replace(".java", "")
+                .replace("*", ".*").replace("$", "\\$");
             compiledExcludePatterns.add(Pattern.compile(excludeRegex));
         }
         if (files != null) {
@@ -192,6 +193,11 @@ public class RerunMojo extends AbstractMojo {
                     String className = packageName + file.getName().replace(".class", "").replace(File.separator, ".");
                     boolean shouldInclude = true;
                     for (Pattern pattern : compiledExcludePatterns) {
+                        System.out.println("+++++++++++++++++++++++++");
+                        System.out.println(pattern);
+                        System.out.println(className);
+                        System.out.println(pattern.matcher(className).matches());
+                        System.out.println("+++++++++++++++++++++++++");
                         if (pattern.matcher(className).matches()) {
                             shouldInclude = false;
                         }
