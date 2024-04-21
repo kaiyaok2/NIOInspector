@@ -339,15 +339,16 @@ public class CollectTestInfoMojo extends AbstractMojo {
                             } else if (c == '}') {
                                 braceCounter--;
                                 if (braceCounter == 0) {
+                                    methodStarted = false;
                                     break;
                                 }
                             }
                         }
                         if (braceCounter == 0) {
+                            methodStarted = false;
                             break;
                         }
                     }
-                    break;
                 } else if (methodStarted) {
                     // Skip all other test methods
                     braceCounter++;
