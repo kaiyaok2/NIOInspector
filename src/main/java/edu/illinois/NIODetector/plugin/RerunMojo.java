@@ -193,11 +193,6 @@ public class RerunMojo extends AbstractMojo {
                     String className = packageName + file.getName().replace(".class", "").replace(File.separator, ".");
                     boolean shouldInclude = true;
                     for (Pattern pattern : compiledExcludePatterns) {
-                        System.out.println("+++++++++++++++++++++++++");
-                        System.out.println(pattern);
-                        System.out.println(className);
-                        System.out.println(pattern.matcher(className).matches());
-                        System.out.println("+++++++++++++++++++++++++");
                         if (pattern.matcher(className).matches()) {
                             shouldInclude = false;
                         }

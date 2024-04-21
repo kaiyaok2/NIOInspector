@@ -131,7 +131,9 @@ public class ClassLoaderIsolatedTestRunner {
         printSummary(summary);
 
         // Reruns
-        Map<String, Integer> NIOtests = new HashMap<>();
+        Map<String, Integer> flakyTests = new HashMap<>();
+        Map<String, Integer> NIOTests = new HashMap<>();
+        Map<String, Integer> NDTests = new HashMap<>();
         for (int i = 0; i < numReruns; i++) {
             logger.info("");
             logger.info("=======================Starting Rerun #" + (i + 1) + "=========================");
@@ -145,10 +147,10 @@ public class ClassLoaderIsolatedTestRunner {
                 if (testStatusInFirstRun.containsKey(testUniqueId) && 
                     testStatusInFirstRun.get(testUniqueId)) {
                         // Test passed in the first iteration but failed in later iteration
-                        if (NIOtests.containsKey(testString)) {
-                            NIOtests.put(testString, NIOtests.get(testString) + 1);
+                        if (flakyTests.containsKey(testString)) {
+                            flakyTests.put(testString, flakyTests.get(testString) + 1);
                         } else {
-                            NIOtests.put(testString, 1);
+                            flakyTests.put(testString, 1);
                         }
                 }
             });
@@ -156,22 +158,32 @@ public class ClassLoaderIsolatedTestRunner {
         }
 
         // Log final results (possible NIO tests)
+        for (Map.Entry<String, Integer> entry : flakyTests.entrySet()) {
+            // Check if a test is not failing in all reruns
+            if (entry.getValue() < numReruns) {
+                NDTests.put(entry.getKey(), entry.getValue());
+            } else {
+                NIOTests.put(entry.getKey(), entry.getValue());
+            }
+        }
         logger.info("");
         logger.info("=========================Final Results=========================");
         logger.info("");
-        if (NIOtests.isEmpty()) {
-            logger.info("No NIO Tests Found");
+        if (flakyTests.isEmpty()) {
+            logger.info("No Flaky Tests Found");
         } else {
-            for (Map.Entry<String, Integer> entry : NIOtests.entrySet()) {
-                // Check if a test is not failing in all reruns
-                if (entry.getValue() < numReruns) {
-                    logger.warn("A Non-deterministic Flaky Test Found:");
-                    logger.warn(entry.getKey() + " (passed in the initial run but failed in " +
-                        entry.getValue() + " out of " + numReruns + " reruns)");
-                } else {
-                    logger.error("A Possible NIO Test Found:");
-                    logger.error(entry.getKey() + " (passed in the initial run but failed in " +
-                        entry.getValue() + " out of " + numReruns + " reruns)");
+            if (!NIOTests.isEmpty()) {
+                logger.error("Number of Possible NIO Test(s) Found: " + NIOTests.size());
+                for (Map.Entry<String, Integer> NIOEntry : NIOTests.entrySet()) {
+                    logger.error(NIOEntry.getKey() + " (passed in the initial run but failed in " +
+                        NIOEntry.getValue() + " out of " + numReruns + " reruns)");
+                }
+            }
+            if (!NDTests.isEmpty()) {
+                logger.warn("Number of Non-deterministic Flaky Test(s) Found: " + NDTests.size());
+                for (Map.Entry<String, Integer> NDEntry : NDTests.entrySet()) {
+                    logger.warn(NDEntry.getKey() + " (passed in the initial run but failed in " +
+                        NDEntry.getValue() + " out of " + numReruns + " reruns)");
                 }
             }
         }
