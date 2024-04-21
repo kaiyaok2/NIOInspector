@@ -349,6 +349,8 @@ public class CollectTestInfoMojo extends AbstractMojo {
                     }
                     break;
                 } else if (methodStarted) {
+                    // Skip all other test methods
+                    braceCounter++;
                     while ((line = reader.readLine()) != null) {
                         for (char c : line.toCharArray()) {
                             if (c == '{') {
