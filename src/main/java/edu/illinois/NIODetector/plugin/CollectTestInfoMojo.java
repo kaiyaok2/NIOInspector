@@ -324,7 +324,7 @@ public class CollectTestInfoMojo extends AbstractMojo {
                     // Start of a test method
                     methodStarted = true;
                     cache = line;
-                } else if (methodStarted && line.trim().startsWith("public void " + methodName + "(")) {
+                } else if (methodStarted && line.contains(methodName + "(")) {
                     testFound = true;
                     testContent.append(cache).append(System.lineSeparator());
                     // Found the start of the specified test method
@@ -332,6 +332,10 @@ public class CollectTestInfoMojo extends AbstractMojo {
                     braceCounter++;
                     // Read until the end of the method
                     while ((line = reader.readLine()) != null) {
+                        // Special case: comments betweem `@Test` and function declaration
+                        if (line.trim().startsWith("//") || line.trim().startsWith("/*")) {
+                            break;
+                        }
                         testContent.append(line).append(System.lineSeparator());
                         for (char c : line.toCharArray()) {
                             if (c == '{') {
@@ -371,7 +375,7 @@ public class CollectTestInfoMojo extends AbstractMojo {
                     }
                 }
                 else {
-                    if (!line.trim().startsWith("import") && packageDefined) {
+                    if (packageDefined) {
                         testContent.append(line).append(System.lineSeparator());
                     }
                 }
