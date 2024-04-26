@@ -1,4 +1,4 @@
-package edu.illinois.NIODetector.plugin;
+package edu.illinois.NIOInspector.plugin;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -14,7 +14,7 @@ import org.apache.maven.plugins.annotations.Parameter;
 @Mojo(name = "downloadFixer")
 public class DownloadFixerMojo extends AbstractMojo {
 
-    @Parameter(property = "url", defaultValue = "https://raw.githubusercontent.com/kaiyaok2/NIODetector/main/GPT_NIO_fixer.py")
+    @Parameter(property = "url", defaultValue = "https://raw.githubusercontent.com/kaiyaok2/NIOInspector/main/GPT_NIO_fixer.py")
     private String url;
 
     @Parameter(property = "outputFile", defaultValue = "GPT_NIO_fixer.py")

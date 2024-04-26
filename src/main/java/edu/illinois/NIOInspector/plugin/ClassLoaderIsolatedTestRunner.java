@@ -1,4 +1,4 @@
-package edu.illinois.NIODetector.plugin;
+package edu.illinois.NIOInspector.plugin;
 
 import org.apache.maven.plugin.MojoExecutionException;
 import org.junit.platform.launcher.Launcher;

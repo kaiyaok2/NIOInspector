@@ -1,4 +1,4 @@
-package edu.illinois.NIODetector.plugin;
+package edu.illinois.NIOInspector.plugin;
 
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugins.annotations.Mojo;
@@ -8,7 +8,7 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import java.io.File;
 
 /**
- * Mojo to clean up files produced by NIODetector
+ * Mojo to clean up files produced by NIOInspector
  */
 @Mojo(name = "clean", defaultPhase = LifecyclePhase.CLEAN)
 public class CleanMojo extends AbstractMojo {
@@ -20,15 +20,15 @@ public class CleanMojo extends AbstractMojo {
     private File projectBaseDirectory;
 
     /**
-     * Check if the .NIODetector directory exists, delete it if so
+     * Check if the .NIOInspector directory exists, delete it if so
      */
     public void execute() {
-        File nioDetectordirectory = new File(projectBaseDirectory, ".NIODetector");
-        if (nioDetectordirectory.exists() && nioDetectordirectory.isDirectory()) {
-            deleteDirectory(nioDetectordirectory);
-            getLog().info("Deleted .NIODetector directory.");
+        File nioInspectordirectory = new File(projectBaseDirectory, ".NIOInspector");
+        if (nioInspectordirectory.exists() && nioInspectordirectory.isDirectory()) {
+            deleteDirectory(nioInspectordirectory);
+            getLog().info("Deleted .NIOInspector directory.");
         } else {
-            getLog().info(".NIODetector directory does not exist.");
+            getLog().info(".NIOInspector directory does not exist.");
         }
     }
 

@@ -42,11 +42,11 @@ def generate_text(extra_prompt_text, max_tokens, buggy_java_test, stacktrace, cu
 
 
 def find_most_recent_run_logs():
-    # Get all the sub-directories containing NIODetector-generated logs
+    # Get all the sub-directories containing NIOinspector-generated logs
     current_directory = os.getcwd()
-    NIO_detector_directory = os.path.join(current_directory, ".NIODetector")
-    subdirectories = [d for d in os.listdir(NIO_detector_directory)\
-                      if os.path.isdir(os.path.join(NIO_detector_directory, d))]
+    NIO_inspector_directory = os.path.join(current_directory, ".NIOinspector")
+    subdirectories = [d for d in os.listdir(NIO_inspector_directory)\
+                      if os.path.isdir(os.path.join(NIO_inspector_directory, d))]
 
     # Convert directory names to datetime objects
     date_formats = ["%Y-%m-%d-%H-%M-%S"]
@@ -61,7 +61,7 @@ def find_most_recent_run_logs():
     # Find the latest subdirectory
     if dates:
         latest_date, latest_subdir = max(dates)
-        print("Latest NIODetector Rerun Timestamp:", latest_date)
+        print("Latest NIOinspector Rerun Timestamp:", latest_date)
         return latest_subdir
     else:
         print("No subdirectories found.")
@@ -83,13 +83,13 @@ if __name__ == "__main__":
     if len(sys.argv) >= 4:
         extra_prompt_text = sys.argv[3]
 
-    # Optional: A subdirectory w.r.t. a specific previous NIODetector rerun to debug. Default is the latest.
+    # Optional: A subdirectory w.r.t. a specific previous NIOinspector rerun to debug. Default is the latest.
     subdirectory_name = find_most_recent_run_logs()
     if len(sys.argv) >= 5:
         subdirectory_name = sys.argv[4]
 
     # Retrieve list of possible NIO lists and debug one by one
-    subdirectory = os.path.join(os.getcwd(), ".NIODetector", subdirectory_name)
+    subdirectory = os.path.join(os.getcwd(), ".NIOInspector", subdirectory_name)
     if os.path.exists(subdirectory):
         NIO_list_path = os.path.join(subdirectory, "possible-NIO-list.txt")
         if os.path.exists(NIO_list_path):
@@ -102,4 +102,4 @@ if __name__ == "__main__":
         else:
             print("possible-NIO-list.txt does not exist in the subdirectory.")
     else:
-        print("Specified subdirectory does not exist or no NIODetector rerun logs available.")
+        print("Specified subdirectory does not exist or no NIOinspector rerun logs available.")

@@ -4,9 +4,33 @@
          
     <modelVersion>4.0.0</modelVersion>
     <groupId>edu.illinois</groupId>
-    <artifactId>NIODetector</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <artifactId>NIOInspector</artifactId>
+    <version>1.0.0</version>
     <packaging>maven-plugin</packaging>
+
+    <name>NIOInspector</name>
+    <description>A tool for detecting and fixing non-idempotent flaky tests</description>
+    <url>https://github.com/kaiyaok2/NIOInspector</url>
+
+    <developers>
+        <developer>
+            <name>Kaiyao Ke</name>
+            <email>kaiyaok22@illinois.edu</email>
+        </developer>
+    </developers>
+
+    <licenses>
+        <license>
+            <name>University of Illinois/NCSA Open Source License</name>
+            <url>https://opensource.org/licenses/NCSA</url>
+        </license>
+    </licenses>
+
+    <scm>
+        <connection>scm:git:git@github.com:kaiyaok2/NIOInspector.git</connection>
+        <developerConnection>scm:git:git@github.com:kaiyaok2/NIOInspector.git</developerConnection>
+        <url>git@github.com:kaiyaok2/NIOInspector.git</url>
+    </scm>
     
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
@@ -77,7 +101,7 @@
                 <artifactId>maven-plugin-plugin</artifactId>
                 <version>3.6.0</version>
                 <configuration>
-                    <goalPrefix>NIODetector</goalPrefix>
+                    <goalPrefix>NIOInspector</goalPrefix>
                 </configuration>
                 <executions>
                     <execution>
@@ -96,4 +120,66 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>2.10.3</version>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.0.0</version>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.6</version>
+                        <executions>
+                            <execution>
+                                <!-- <configuration>
+                                    <executable>gpg2</executable>
+                                        <passphrase>XXX</passphrase>
+                                </configuration> -->
+                                <id>sign-artifacts</id>
+                                <phase>deploy</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.plugins</groupId>
+                        <artifactId>nexus-staging-maven-plugin</artifactId>
+                        <version>1.6.7</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <serverId>ossrh</serverId>
+                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                            <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

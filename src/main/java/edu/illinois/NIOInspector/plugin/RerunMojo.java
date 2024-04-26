@@ -1,4 +1,4 @@
-package edu.illinois.NIODetector.plugin;
+package edu.illinois.NIOInspector.plugin;
 
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.model.Plugin;
@@ -45,7 +45,7 @@ public class RerunMojo extends AbstractMojo {
     private MavenProject project;
 
     /**
-     * Reference to the artifacts needed by NIODetector
+     * Reference to the artifacts needed by NIOInspector
      */
     @Parameter(defaultValue = "${plugin.artifacts}", readonly = true, required = true)
     private List<Artifact> pluginArtifacts;
@@ -103,7 +103,7 @@ public class RerunMojo extends AbstractMojo {
 
             List<URL> allURLs = new ArrayList<>();
             try {
-                // Get all dependencies needed for NIODetector plugin
+                // Get all dependencies needed for NIOInspector plugin
                 List<URL> pluginDependencies = new ArrayList<>();
                 for (Artifact artifact : pluginArtifacts) {
                     if (artifact.getFile() != null) {

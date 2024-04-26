@@ -1,4 +1,4 @@
-package edu.illinois.NIODetector.plugin;
+package edu.illinois.NIOInspector.plugin;
 
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -42,7 +42,7 @@ public class CollectTestInfoMojo extends AbstractMojo {
     @Parameter(property = "testSourceDirectory", defaultValue = "${project.build.testSourceDirectory}")
     private File testSourceDirectory;
 
-    private static final String LOG_DIRECTORY = ".NIODetector";
+    private static final String LOG_DIRECTORY = ".NIOInspector";
 
     /**
      * Find source test code w.r.t each possible NIO and reduce it
@@ -55,7 +55,7 @@ public class CollectTestInfoMojo extends AbstractMojo {
 
             File logDirectory = new File(LOG_DIRECTORY);
 
-            // List all time-base named subdirectories in the .NIODetector directory
+            // List all time-base named subdirectories in the .NIOInspector directory
             File[] subdirectories = logDirectory.listFiles(File::isDirectory);
 
             if (subdirectories != null) {
