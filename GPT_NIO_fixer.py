@@ -8,33 +8,42 @@ def get_test_info(cur_test_info_directory):
     if os.path.exists(reduced_buggy_method_code_path):
         with open(reduced_buggy_method_code_path, "r") as file:
             buggy_java_test_contents = file.read()
-    stacktrace_path = os.path.join(cur_test_info_directory, "stacktrace")
-    if os.path.exists(stacktrace_path):
-        with open(stacktrace_path, "r") as file:
-            stacktrace_contents = file.read()
+    max_n = 3  # using a small number to avoid overflowing context window
+    stacktrace_contents = []
+    for n in range(1, max_n + 1):
+        stacktrace_file = os.path.join(cur_test_info_directory, "stacktrace" + str(n))
+        if os.path.exists(stacktrace_file):
+            with open(stacktrace_file, "r") as file:
+                stacktrace_contents.append(file.read())
+        else:
+            break
     return buggy_java_test_contents, stacktrace_contents
 
 
 client = OpenAI(api_key=sys.argv[1])
 
 def generate_text(extra_prompt_text, max_tokens, buggy_java_test, stacktrace, cur_test_info_directory):
-    prompt = extra_prompt_text +\
-             "The test always passes at the first time but fails in all subsequent runs in the same JVM. " +\
+    stacktrace_text = ""
+    for rerun_num in range(len(stacktraces)):
+        stacktrace_text += ("Below is the error message in run #" + str(rerun_num + 1) + ":\n```\n" + stacktraces[rerun_num] + "\n```\n")
+    prompt = "I need to fix a non-idempotent test that always passes in the first run but fails in all repeated runs in the same JVM. " +\
              "In other words, the test has side effects and “self-pollutes” the state shared among test runs," +\
-             "so only the first run succeeds:\n```\n" +\
+             "so only the first run succeeds. An example of a non-idempotent test is `void t1() { assertEquals(w, 0); w = 1; }`," +\
+             "and a fix is to reset `w` to `0`. Now here's the actual non-idempotent test I need to debug:\n```\n" +\
              str(buggy_java_test) +\
-             "```\n The error message is:\n```\n" +\
-             str(stacktrace) +\
-             "```\n Please fix this test, and answer with only Java code. Do not include any explanation."
+             "```\n" +\
+             stacktrace_text +\
+             "Please fix this test, and answer with only Java code. Do not include any explanation." +\
+             extra_prompt_text
     
-    # Generate text using GPT-4
+    # Generate fix using GPT-4
     message=[{"role": "user", "content": prompt}]
     response = client.chat.completions.create(
                 model="gpt-4",
                 messages=message,
                 temperature=0.7,
                 max_tokens=max_tokens)
-    # Print the generated text
+    # Print the fix to console and write it to patch text file.
     print(response.choices[0].message)
     patch_path = os.path.join(cur_test_info_directory, "patch.txt")
     with open(patch_path, "w") as text_file:
@@ -97,8 +106,8 @@ if __name__ == "__main__":
                 for line in file:
                     cur_test = line.strip().replace("#", ".")
                     cur_test_info_directory = os.path.join(subdirectory, cur_test)
-                    reduced_buggy_test_code, stacktrace = get_test_info(cur_test_info_directory)
-                    generate_text(extra_prompt_text, max_tokens, reduced_buggy_test_code, stacktrace, cur_test_info_directory)
+                    reduced_buggy_test_code, stacktraces = get_test_info(cur_test_info_directory)
+                    generate_text(extra_prompt_text, max_tokens, reduced_buggy_test_code, stacktraces, cur_test_info_directory)
         else:
             print("possible-NIO-list.txt does not exist in the subdirectory.")
     else:

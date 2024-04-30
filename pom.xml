@@ -15,7 +15,7 @@
     <developers>
         <developer>
             <name>Kaiyao Ke</name>
-            <email>kaiyaok22@illinois.edu</email>
+            <email>kaiyaok2@illinois.edu</email>
         </developer>
     </developers>
 
@@ -155,10 +155,10 @@
                         <version>1.6</version>
                         <executions>
                             <execution>
-                                <!-- <configuration>
+                                <configuration>
                                     <executable>gpg2</executable>
                                         <passphrase>XXX</passphrase>
-                                </configuration> -->
+                                </configuration>
                                 <id>sign-artifacts</id>
                                 <phase>deploy</phase>
                                 <goals>

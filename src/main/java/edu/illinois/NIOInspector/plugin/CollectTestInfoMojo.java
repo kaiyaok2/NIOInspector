@@ -115,19 +115,21 @@ public class CollectTestInfoMojo extends AbstractMojo {
         try (BufferedReader reader = new BufferedReader(new FileReader(logFile))) {
             String line;
             int startLine = -1;
-            boolean inFirstRerun = false;
+            boolean inRerunExamination = false;
             int lineNum = 0;
-            Pattern firstRerunStartPattern = Pattern.compile("\\[INFO\\] =======================Starting Rerun #1=========================");
+            int rerunNum = 0;
+            Pattern rerunStartPattern = Pattern.compile("\\[INFO\\] =======================Starting Rerun #");
             Pattern failingTestReportPattern = Pattern.compile("\\[WARN\\] Failing Test: " + Pattern.quote(possibleNIOTest));
             Pattern failureMessagePattern = Pattern.compile("Failure message:");
             String NIOTestName = possibleNIOTest.replace("#", ".");
             // Find the stacktrace of the possible NIOTest in the first rerun.
             while ((line = reader.readLine()) != null) {
                 lineNum++;
-                if (!inFirstRerun) {
-                    Matcher firstRerunStartMatcher = firstRerunStartPattern.matcher(line);
-                    if (firstRerunStartMatcher.find()) {
-                        inFirstRerun = true;
+                if (!inRerunExamination) {
+                    Matcher rerunStartMatcher = rerunStartPattern.matcher(line);
+                    if (rerunStartMatcher.find()) {
+                        inRerunExamination = true;
+                        rerunNum++;
                     }
                 } else {
                     Matcher failingTestReportMatcher = failingTestReportPattern.matcher(line);
@@ -137,11 +139,11 @@ public class CollectTestInfoMojo extends AbstractMojo {
                 }
                 Matcher failureMatcher = failureMessagePattern.matcher(line);
                 if (failureMatcher.find() && startLine != -1) {
-                    extractStackTrace(startLine, parentDirectory, logFile, NIOTestName);
-                    return;
+                    extractStackTrace(startLine, parentDirectory, logFile, NIOTestName, rerunNum);
+                    inRerunExamination = false;
+                    startLine = -1;
                 }
             }
-            getLog().info("Failed to extract log");
         } catch (IOException e) {
             throw new MojoExecutionException("An error occurred while processing log file.", e);
         }
@@ -153,14 +155,15 @@ public class CollectTestInfoMojo extends AbstractMojo {
      * @param parentDirectory The directory to store the stack trace written
      * @param logFile The log file produced by running the Rerun Mojo
      * @param NIOTestName The name of the NIO method to be used as part of file name of the written stack trace
+     * @param rerunNum The rerun number to examine
      */
-    private void extractStackTrace(int startLine, String parentDirectory, File logFile, String NIOTestName) throws IOException {
+    private void extractStackTrace(int startLine, String parentDirectory, File logFile, String NIOTestName, int rerunNum) throws IOException {
         File subDirectory = new File(parentDirectory + File.separator + NIOTestName);
         if (!subDirectory.exists()) {
             subDirectory.mkdir();
         }
         try (BufferedReader reader = new BufferedReader(new FileReader(logFile));
-             BufferedWriter writer = new BufferedWriter(new FileWriter(new File(subDirectory, "stacktrace")))) {
+             BufferedWriter writer = new BufferedWriter(new FileWriter(new File(subDirectory, "stacktrace" + rerunNum)))) {
             String line;
             int lineNum = 0;
             boolean startedWriting = false;
@@ -177,7 +180,7 @@ public class CollectTestInfoMojo extends AbstractMojo {
                     }
                 }
             }
-            getLog().info("Extracted log saved to extracted_stacktrace_" + logFile.getName());
+            getLog().info("Extracted log saved to " + subDirectory.getName());
         }
     }
 
@@ -299,6 +302,7 @@ public class CollectTestInfoMojo extends AbstractMojo {
     private void writeBuggyJavaFile(String className, String methodName, File testFile, String parentDirectory) {
         try (BufferedReader reader = new BufferedReader(new FileReader(testFile))) {
             StringBuilder testContent = new StringBuilder();
+            StringBuilder allAnnotations = new StringBuilder();
             String line;
             boolean methodStarted = false;
             int braceCounter = 0;
@@ -307,7 +311,6 @@ public class CollectTestInfoMojo extends AbstractMojo {
             String parentClass = null;
             Pattern inheritancePattern = Pattern.compile("public class\\s+(\\w+)\\s+extends\\s+(\\w+)");
             boolean packageDefined = false;
-            String cache = null;
 
             while ((line = reader.readLine()) != null) {
                 if (line.trim().startsWith("package ")) {
@@ -323,19 +326,21 @@ public class CollectTestInfoMojo extends AbstractMojo {
                 if (!methodStarted && line.contains("@Test")) {
                     // Start of a test method
                     methodStarted = true;
-                    cache = line;
+                    allAnnotations.append(line).append(System.lineSeparator());
+                } else if (methodStarted && line.trim().startsWith("@")) {
+                    // Other annotations (e.g. @Override)
+                    allAnnotations.append(line).append(System.lineSeparator());
+                } else if (line.trim().startsWith("//") || line.trim().startsWith("/*")) {
+                    // Special case: comments between `@Test` and function declaration
+                    continue;
                 } else if (methodStarted && line.contains(methodName + "(")) {
                     testFound = true;
-                    testContent.append(cache).append(System.lineSeparator());
+                    testContent.append(allAnnotations.toString());
                     // Found the start of the specified test method
                     testContent.append(line).append(System.lineSeparator());
                     braceCounter++;
                     // Read until the end of the method
                     while ((line = reader.readLine()) != null) {
-                        // Special case: comments betweem `@Test` and function declaration
-                        if (line.trim().startsWith("//") || line.trim().startsWith("/*")) {
-                            break;
-                        }
                         testContent.append(line).append(System.lineSeparator());
                         for (char c : line.toCharArray()) {
                             if (c == '{') {
