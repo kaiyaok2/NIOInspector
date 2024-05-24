@@ -8,6 +8,10 @@ def get_test_info(cur_test_info_directory):
     if os.path.exists(reduced_buggy_method_code_path):
         with open(reduced_buggy_method_code_path, "r") as file:
             buggy_java_test_contents = file.read()
+    source_code_path = os.path.join(cur_test_info_directory, "sourceCode")
+    if os.path.exists(source_code_path):
+        with open(source_code_path, "r") as file:
+            source_code_contents = file.read()
     max_n = 3  # using a small number to avoid overflowing context window
     stacktrace_contents = []
     for n in range(1, max_n + 1):
@@ -17,23 +21,29 @@ def get_test_info(cur_test_info_directory):
                 stacktrace_contents.append(file.read())
         else:
             break
-    return buggy_java_test_contents, stacktrace_contents
+    return buggy_java_test_contents, source_code_contents, stacktrace_contents
 
 
 client = OpenAI(api_key=sys.argv[1])
 
-def generate_text(extra_prompt_text, max_tokens, buggy_java_test, stacktrace, cur_test_info_directory):
+def generate_text(extra_prompt_text, max_tokens, buggy_java_test, source_code, stacktraces, cur_test_info_directory, test_name):
     stacktrace_text = ""
     for rerun_num in range(len(stacktraces)):
         stacktrace_text += ("Below is the error message in run #" + str(rerun_num + 1) + ":\n```\n" + stacktraces[rerun_num] + "\n```\n")
     prompt = "I need to fix a non-idempotent test that always passes in the first run but fails in all repeated runs in the same JVM. " +\
              "In other words, the test has side effects and “self-pollutes” the state shared among test runs," +\
              "so only the first run succeeds. An example of a non-idempotent test is `void t1() { assertEquals(w, 0); w = 1; }`," +\
-             "and a fix is to reset `w` to `0`. Now here's the actual non-idempotent test I need to debug:\n```\n" +\
+             "and a fix is to reset `w` to `0`. Now here's the actual non-idempotent test `" +\
+             test_name +\
+             "` that I need to debug:\n```\n" +\
              str(buggy_java_test) +\
              "```\n" +\
              stacktrace_text +\
-             "Please fix this test, and answer with only Java code. Do not include any explanation." +\
+             "Below is the main class relevant to the test class - it may contain methods to clean up polluted states: ```\n" +\
+             source_code +\
+             "\n```\nPlease fix the non-idempotent test `" +\
+             test_name +\
+             "`, and answer with only Java code. Do not include any explanation." +\
              extra_prompt_text
     
     # Generate fix using GPT-4
@@ -106,8 +116,9 @@ if __name__ == "__main__":
                 for line in file:
                     cur_test = line.strip().replace("#", ".")
                     cur_test_info_directory = os.path.join(subdirectory, cur_test)
-                    reduced_buggy_test_code, stacktraces = get_test_info(cur_test_info_directory)
-                    generate_text(extra_prompt_text, max_tokens, reduced_buggy_test_code, stacktraces, cur_test_info_directory)
+                    reduced_buggy_test_code, source_code, stacktraces = get_test_info(cur_test_info_directory)
+                    generate_text(extra_prompt_text, max_tokens, reduced_buggy_test_code, source_code,
+                                  stacktraces, cur_test_info_directory, cur_test.split(".")[-1])
         else:
             print("possible-NIO-list.txt does not exist in the subdirectory.")
     else:

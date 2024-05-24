@@ -8,6 +8,7 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -36,6 +37,12 @@ public class CollectTestInfoMojo extends AbstractMojo {
     @Parameter(property = "logFile")
     private String logFilePath;
 
+    /**
+     * Directory to main source files, (i.e. src/main/...)
+     */
+    @Parameter(property = "sourceDirectory", defaultValue = "${project.build.sourceDirectory}")
+    private File sourceDirectory;
+    
     /**
      * Directory to test source files. (i.e. src/test/...)
      */
@@ -81,7 +88,7 @@ public class CollectTestInfoMojo extends AbstractMojo {
         String parentDirectory = logFile.getParent();
 
         // Get a list of all possible NIO tests
-        List<String> possibleNIOTests = getPossibleNIOTestss(logFile);
+        List<String> possibleNIOTests = getPossibleNIOTests(logFile);
         if (possibleNIOTests.isEmpty()) {
             getLog().info("No error strings found");
             return;
@@ -100,13 +107,16 @@ public class CollectTestInfoMojo extends AbstractMojo {
             // Write reduced test code at method granularity
             writeReducedTestFile(possibleNIOTest, parentDirectory);
 
-            // Write stacktrace of the failure in the first rerun
+            // Write most relevant source code
+            writeReducedSourceCode(possibleNIOTest, parentDirectory);
+
+            // Write stacktrace of the failure in each rerun
             writeStackTrace(possibleNIOTest, parentDirectory, logFile);
         }
     }
 
     /**
-     * Write the stack trace of a possible NIO test in its first rerun
+     * Write the stack trace of a possible NIO test in each rerun
      * @param possibleNIOTest The name of the test to write stack trace for
      * @param parentDirectory The directory to store the stack trace written
      * @param logFile The log file produced by running the Rerun Mojo
@@ -122,7 +132,7 @@ public class CollectTestInfoMojo extends AbstractMojo {
             Pattern failingTestReportPattern = Pattern.compile("\\[WARN\\] Failing Test: " + Pattern.quote(possibleNIOTest));
             Pattern failureMessagePattern = Pattern.compile("Failure message:");
             String NIOTestName = possibleNIOTest.replace("#", ".");
-            // Find the stacktrace of the possible NIOTest in the first rerun.
+            // Find the stacktrace of the possible NIOTest in each rerun.
             while ((line = reader.readLine()) != null) {
                 lineNum++;
                 if (!inRerunExamination) {
@@ -180,7 +190,7 @@ public class CollectTestInfoMojo extends AbstractMojo {
                     }
                 }
             }
-            getLog().info("Extracted log saved to " + subDirectory.getName());
+            getLog().info("Extracted log for rerun#" + rerunNum + "saved to " + subDirectory.getName());
         }
     }
 
@@ -206,7 +216,7 @@ public class CollectTestInfoMojo extends AbstractMojo {
      * @param logFile The log file to parse.
      * @return A list of error strings.
      */
-    private List<String> getPossibleNIOTestss(File logFile) {
+    private List<String> getPossibleNIOTests(File logFile) {
         List<String> possibleNIOTestss = new ArrayList<>();
 
         try (BufferedReader reader = new BufferedReader(new FileReader(logFile))) {
@@ -271,35 +281,35 @@ public class CollectTestInfoMojo extends AbstractMojo {
 
     /**
      * Writes the reduced test file w.r.t one possible NIO test
-     * @param possibleNIOTests The string containing class and method names.
+     * @param possibleNIOTest The string containing class and method names.
      * @param parentDirectory The parent directory of the files to be written.
      */
-    private void writeReducedTestFile(String possibleNIOTests, String parentDirectory) {
-        String[] errorParts = possibleNIOTests.split("#");
+    private void writeReducedTestFile(String possibleNIOTest, String parentDirectory) {
+        String[] errorParts = possibleNIOTest.split("#");
         if (errorParts.length != 2) {
-            getLog().warn("Invalid error string format: " + possibleNIOTests);
+            getLog().warn("Invalid error string format: " + possibleNIOTest);
             return;
         }
 
-        String className = errorParts[0];
+        String classPath = errorParts[0];
         String methodName = errorParts[1];
 
-        File testFile = new File(testSourceDirectory, className.replace('.', File.separatorChar) + ".java");
+        File testFile = new File(testSourceDirectory, classPath.replace('.', File.separatorChar) + ".java");
         if (!testFile.exists()) {
             getLog().warn("Test file not found: " + testFile.getAbsolutePath());
             return;
         }
-        writeBuggyJavaFile(className, methodName, testFile, parentDirectory);
+        writeBuggyJavaFile(classPath, methodName, testFile, parentDirectory);
     }
 
     /**
      * Helper of `writeReducedTestFile()` - reduce test code and write to output
-     * @param className The name of the test class.
+     * @param classPath The path to the test class.
      * @param methodName The name of the test method.
      * @param testFile The test file containing the source code of the test method.
      * @param parentDirectory The parent directory of the files to be written.
      */
-    private void writeBuggyJavaFile(String className, String methodName, File testFile, String parentDirectory) {
+    private void writeBuggyJavaFile(String classPath, String methodName, File testFile, String parentDirectory) {
         try (BufferedReader reader = new BufferedReader(new FileReader(testFile))) {
             StringBuilder testContent = new StringBuilder();
             StringBuilder allAnnotations = new StringBuilder();
@@ -390,15 +400,15 @@ public class CollectTestInfoMojo extends AbstractMojo {
             if (!testFound) {
                 if (hasParentClass) {
                     File parentClassFile = findParentTestClassFile(parentClass, testSourceDirectory);
-                    writeBuggyJavaFile(className, methodName, parentClassFile, parentDirectory);
+                    writeBuggyJavaFile(classPath, methodName, parentClassFile, parentDirectory);
                     return;
                 }
-                getLog().warn("Test method not found: " + methodName + " in " + className);
+                getLog().warn("Test method not found: " + methodName + " in " + classPath);
                 return;
             }
 
             // Write reduced test source code
-            File subDirectory = new File(parentDirectory + File.separator + className + "." + methodName);
+            File subDirectory = new File(parentDirectory + File.separator + classPath + "." + methodName);
             if (!subDirectory.exists()) {
                 subDirectory.mkdir();
             }
@@ -411,5 +421,131 @@ public class CollectTestInfoMojo extends AbstractMojo {
         } catch (IOException e) {
             getLog().error("Error reading file: " + testFile.getAbsolutePath(), e);
         }
+    }
+
+    /**
+     * Writes the most relevant source code w.r.t one possible NIO test
+     * @param possibleNIOTest The string containing class and method names.
+     * @param parentDirectory The parent directory of the files to be written.
+     */
+    private void writeReducedSourceCode(String possibleNIOTest, String parentDirectory) {
+        // Get the name of the class and find most related source file
+        String[] classPath = possibleNIOTest.split("#")[0].split("\\.");
+        String className = classPath[classPath.length - 1];
+        File sourceFile = null;
+        try {
+            sourceFile = findSourceFileForTestClass(className, sourceDirectory);
+        } catch (Exception e) {
+            getLog().error("Error finding most relevant source file.", e);
+        }
+
+        // Locate the folder to write source file content
+        String NIOTestName = possibleNIOTest.replace("#", ".");
+        File subDirectory = new File(parentDirectory + File.separator + NIOTestName);
+        if (!subDirectory.exists()) {
+            subDirectory.mkdir();
+        }
+
+        // Read the contents of the source file and write it to `sourceCode`
+        StringBuilder contentBuilder = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new FileReader(sourceFile))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                contentBuilder.append(line).append("\n");
+            }
+        } catch (Exception e) {
+            getLog().error("Error reading source file", e);
+        }
+        String sourceCode = contentBuilder.toString();
+        File outputFile = new File(subDirectory, "sourceCode");
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile))) {
+            writer.write(sourceCode);
+        } catch (Exception e) {
+            getLog().error("Error writing content in source file", e);
+        }
+    }
+
+    /**
+     * Finds the most relevant source file for a test class using the Levenshtein distance.
+     * @param testClassName the name of the test class
+     * @param sourceDirectory the directory to search for source files
+     * @return the most relevant source file, or null if no match is found
+     * @throws IOException if an I/O error occurs
+     */
+    private File findSourceFileForTestClass(String testClassName, File sourceDirectory) throws IOException {
+        List<File> sourceFiles = new ArrayList<>();
+
+        // Collect all source files
+        List<File> directoriesToProcess = new ArrayList<>();
+        directoriesToProcess.add(sourceDirectory);
+        while (!directoriesToProcess.isEmpty()) {
+            File currentDirectory = directoriesToProcess.remove(0);
+            File[] files = currentDirectory.listFiles(new FileFilter() {
+                @Override
+                public boolean accept(File file) {
+                    return file.isDirectory() || file.getName().endsWith(".java");
+                }
+            });
+
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isDirectory()) {
+                        directoriesToProcess.add(file);
+                    } else {
+                        sourceFiles.add(file);
+                    }
+                }
+            }
+        }
+
+        // Extract base name of test class
+        String baseTestClassName = testClassName.replaceAll("Test$", "").replaceAll("TestCase$", "");
+
+        // Find best match using Levenshtein Distance
+        File bestMatch = null;
+        int bestScore = Integer.MAX_VALUE;
+
+        for (File file : sourceFiles) {
+            String fileName = file.getName();
+            String baseFileName = fileName.replace(".java", "");
+            int score = levenshteinDistance(baseTestClassName, baseFileName);
+
+            if (score < bestScore) {
+                bestScore = score;
+                bestMatch = file;
+            }
+        }
+
+        return bestMatch;
+    }
+
+    
+    
+    /**
+     * Calculates the Levenshtein distance(# single-character edits) between 2 strings
+     * @param a the first string
+     * @param b the second string
+     * @return the Levenshtein distance between the two strings
+     */
+    private int levenshteinDistance(String a, String b) {
+        int[][] dp = new int[a.length() + 1][b.length() + 1];
+
+        // dynamic programming with memoization
+        for (int i = 0; i <= a.length(); i++) {
+            for (int j = 0; j <= b.length(); j++) {
+                if (i == 0) {
+                    dp[i][j] = j;
+                } else if (j == 0) {
+                    dp[i][j] = i;
+                } else {
+                    dp[i][j] = Math.min(
+                        dp[i - 1][j - 1] + (a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1),
+                        Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1)
+                    );
+                }
+            }
+        }
+
+        return dp[a.length()][b.length()];
     }
 }
