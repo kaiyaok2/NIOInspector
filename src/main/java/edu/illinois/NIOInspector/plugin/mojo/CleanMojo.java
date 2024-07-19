@@ -1,4 +1,4 @@
-package edu.illinois.NIOInspector.plugin;
+package edu.illinois.NIOInspector.plugin.mojo;
 
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugins.annotations.Mojo;

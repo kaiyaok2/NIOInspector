@@ -1,4 +1,4 @@
-package edu.illinois.NIOInspector.plugin;
+package edu.illinois.NIOInspector.plugin.mojo;
 
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.model.Plugin;
@@ -11,7 +11,9 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.project.MavenProject;
 
 import org.codehaus.plexus.util.xml.Xpp3Dom;
-import org.w3c.dom.NodeList;
+
+import edu.illinois.NIOInspector.plugin.util.ClassLoaderIsolatedTestRunner;
+import edu.illinois.NIOInspector.plugin.util.IsolatedURLClassLoader;
 
 import java.io.File;
 import java.io.IOException;

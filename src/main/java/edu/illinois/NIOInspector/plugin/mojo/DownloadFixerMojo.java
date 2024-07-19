@@ -1,4 +1,4 @@
-package edu.illinois.NIOInspector.plugin;
+package edu.illinois.NIOInspector.plugin.mojo;
 
 import java.io.FileOutputStream;
 import java.io.IOException;

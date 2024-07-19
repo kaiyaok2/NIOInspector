@@ -9,7 +9,7 @@
         </encoder>
     </appender>
 
-    <appender name="CUSTOM_FILE" class="edu.illinois.NIOInspector.plugin.CustomTimeBasedFileAppender">
+    <appender name="CUSTOM_FILE" class="edu.illinois.NIOInspector.plugin.util.CustomTimeBasedFileAppender">
         <file>.NIOInspector/current-time/rerun-results</file>
         <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
             <layout class="ch.qos.logback.classic.PatternLayout">
