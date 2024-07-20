@@ -1,5 +1,7 @@
 package edu.illinois.NIOInspector.plugin.mojo;
 
+import static edu.illinois.NIOInspector.plugin.util.StackTraceLineNumberExtractor.findLineNumberInStackTrace;
+
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
@@ -172,8 +174,9 @@ public class CollectTestInfoMojo extends AbstractMojo {
         if (!subDirectory.exists()) {
             subDirectory.mkdir();
         }
+        File stackTraceOfRerunNum = new File(subDirectory, "stacktrace" + rerunNum);
         try (BufferedReader reader = new BufferedReader(new FileReader(logFile));
-             BufferedWriter writer = new BufferedWriter(new FileWriter(new File(subDirectory, "stacktrace" + rerunNum)))) {
+            BufferedWriter writer = new BufferedWriter(new FileWriter(stackTraceOfRerunNum))) {
             String line;
             int lineNum = 0;
             boolean startedWriting = false;
@@ -190,7 +193,28 @@ public class CollectTestInfoMojo extends AbstractMojo {
                     }
                 }
             }
-            getLog().info("Extracted log for rerun#" + rerunNum + "saved to " + subDirectory.getName());
+            getLog().info("Extracted log for rerun #" + rerunNum + " saved to " + subDirectory.getName());
+        }
+        File bugLineOfRerunNum = new File(subDirectory, "error_line" + rerunNum);
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(bugLineOfRerunNum))) {
+            String testClassPath = NIOTestName.substring(0, NIOTestName.lastIndexOf('.'));
+            int bugLineNum = findLineNumberInStackTrace(stackTraceOfRerunNum, testClassPath);
+            File testFile = new File(testSourceDirectory, testClassPath.replace('.', File.separatorChar) + ".java");
+            if (!testFile.exists()) {
+                getLog().warn("Test file not found: " + testFile.getAbsolutePath());
+                return;
+            }
+            try (BufferedReader reader = new BufferedReader(new FileReader(testFile))) {
+                int curLineNum = 0;
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    curLineNum ++;
+                    if (curLineNum == bugLineNum) {
+                        writer.write(line);
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -217,7 +241,7 @@ public class CollectTestInfoMojo extends AbstractMojo {
      * @return A list of error strings.
      */
     private List<String> getPossibleNIOTests(File logFile) {
-        List<String> possibleNIOTestss = new ArrayList<>();
+        List<String> possibleNIOTests = new ArrayList<>();
 
         try (BufferedReader reader = new BufferedReader(new FileReader(logFile))) {
             String line;
@@ -241,15 +265,15 @@ public class CollectTestInfoMojo extends AbstractMojo {
                 line = reader.readLine();
                 while (line != null && line.startsWith("[ERROR] ")) {
                     // Extract the error string
-                    String possibleNIOTests = line.substring("[ERROR] ".length()).split(" \\(passed in the initial run")[0];
-                    possibleNIOTestss.add(possibleNIOTests);
+                    String possibleNIOTest = line.substring("[ERROR] ".length()).split(" \\(passed in the initial run")[0];
+                    possibleNIOTests.add(possibleNIOTest);
                     line = reader.readLine();
                 }
             }
         } catch (IOException e) {
             getLog().error("Error reading log file: " + logFile.getAbsolutePath(), e);
         }
-        return possibleNIOTestss;
+        return possibleNIOTests;
     }
 
     /**
@@ -321,6 +345,7 @@ public class CollectTestInfoMojo extends AbstractMojo {
             String parentClass = null;
             Pattern inheritancePattern = Pattern.compile("public class\\s+(\\w+)\\s+extends\\s+(\\w+)");
             boolean packageDefined = false;
+            boolean inBlockComment = false;
 
             while ((line = reader.readLine()) != null) {
                 if (line.trim().startsWith("package ")) {
@@ -333,22 +358,44 @@ public class CollectTestInfoMojo extends AbstractMojo {
                     parentClass = matcher.group(2);
                     hasParentClass = true;
                 }
-                if (!methodStarted && line.contains("@Test")) {
+                if (!methodStarted && line.trim().startsWith("@Test")) {
                     // Start of a test method
                     methodStarted = true;
                     allAnnotations.append(line).append(System.lineSeparator());
                 } else if (methodStarted && line.trim().startsWith("@")) {
                     // Other annotations (e.g. @Override)
                     allAnnotations.append(line).append(System.lineSeparator());
-                } else if (line.trim().startsWith("//") || line.trim().startsWith("/*")) {
-                    // Special case: comments between `@Test` and function declaration
+                } else if (inBlockComment && line.trim().contains("*/")) {
+                    inBlockComment = false;
+                    continue;
+                } else if (line.trim().startsWith("//") || inBlockComment) {
+                    // skip lines of comments
+                    continue;
+                } else if (line.trim().startsWith("/*")) {
+                    inBlockComment = true;
+                    if (line.trim().contains("*/")) {
+                        inBlockComment = false;
+                    }
                     continue;
                 } else if (methodStarted && line.contains(methodName + "(")) {
                     testFound = true;
                     testContent.append(allAnnotations.toString());
                     // Found the start of the specified test method
                     testContent.append(line).append(System.lineSeparator());
-                    braceCounter++;
+                    for (char c : line.toCharArray()) {
+                        if (c == '{') {
+                            braceCounter++;
+                        } else if (c == '}') {
+                            braceCounter--;
+                            if (braceCounter == 0) {
+                                methodStarted = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (!methodStarted) {
+                        continue;
+                    }
                     // Read until the end of the method
                     while ((line = reader.readLine()) != null) {
                         testContent.append(line).append(System.lineSeparator());
@@ -363,14 +410,26 @@ public class CollectTestInfoMojo extends AbstractMojo {
                                 }
                             }
                         }
-                        if (braceCounter == 0) {
-                            methodStarted = false;
+                        if (!methodStarted) {
                             break;
                         }
                     }
                 } else if (methodStarted) {
                     // Skip all other test methods
-                    braceCounter++;
+                    for (char c : line.toCharArray()) {
+                        if (c == '{') {
+                            braceCounter++;
+                        } else if (c == '}') {
+                            braceCounter--;
+                            if (braceCounter == 0) {
+                                methodStarted = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (!methodStarted) {
+                        continue;
+                    }
                     while ((line = reader.readLine()) != null) {
                         for (char c : line.toCharArray()) {
                             if (c == '{') {
@@ -383,13 +442,11 @@ public class CollectTestInfoMojo extends AbstractMojo {
                                 }
                             }
                         }
-                        if (braceCounter == 0) {
-                            methodStarted = false;
+                        if (!methodStarted) {
                             break;
                         }
                     }
-                }
-                else {
+                } else {
                     if (packageDefined) {
                         testContent.append(line).append(System.lineSeparator());
                     }

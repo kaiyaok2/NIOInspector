@@ -21,15 +21,24 @@ def get_test_info(cur_test_info_directory):
                 stacktrace_contents.append(file.read())
         else:
             break
-    return buggy_java_test_contents, source_code_contents, stacktrace_contents
+    error_line_contents = []
+    for n in range(1, max_n + 1):
+        error_line_file = os.path.join(cur_test_info_directory, "error_line" + str(n))
+        if os.path.exists(error_line_file):
+            with open(error_line_file, "r") as file:
+                error_line_contents.append(file.read())
+        else:
+            break
+    return buggy_java_test_contents, source_code_contents, stacktrace_contents, error_line_contents
 
 
 client = OpenAI(api_key=sys.argv[1])
 
-def generate_text(extra_prompt_text, max_tokens, buggy_java_test, source_code, stacktraces, cur_test_info_directory, test_name):
+def generate_text(extra_prompt_text, max_tokens, buggy_java_test, source_code, stacktraces, error_lines, cur_test_info_directory, test_name):
     stacktrace_text = ""
     for rerun_num in range(len(stacktraces)):
         stacktrace_text += ("Below is the error message in run #" + str(rerun_num + 1) + ":\n```\n" + stacktraces[rerun_num] + "\n```\n")
+        stacktrace_text += ("And the error occurs at this line: " + ":\n```\n" + error_lines[rerun_num] + "\n```\n")
     prompt = "I need to fix a non-idempotent test that always passes in the first run but fails in all repeated runs in the same JVM. " +\
              "In other words, the test has side effects and “self-pollutes” the state shared among test runs," +\
              "so only the first run succeeds. An example of a non-idempotent test is `void t1() { assertEquals(w, 0); w = 1; }`," +\
@@ -116,9 +125,9 @@ if __name__ == "__main__":
                 for line in file:
                     cur_test = line.strip().replace("#", ".")
                     cur_test_info_directory = os.path.join(subdirectory, cur_test)
-                    reduced_buggy_test_code, source_code, stacktraces = get_test_info(cur_test_info_directory)
+                    reduced_buggy_test_code, source_code, stacktraces, error_lines = get_test_info(cur_test_info_directory)
                     generate_text(extra_prompt_text, max_tokens, reduced_buggy_test_code, source_code,
-                                  stacktraces, cur_test_info_directory, cur_test.split(".")[-1])
+                                  stacktraces, error_lines, cur_test_info_directory, cur_test.split(".")[-1])
         else:
             print("possible-NIO-list.txt does not exist in the subdirectory.")
     else:
