@@ -12,8 +12,8 @@ import org.apache.maven.project.MavenProject;
 
 import org.codehaus.plexus.util.xml.Xpp3Dom;
 
-import edu.illinois.NIOInspector.plugin.util.ClassLoaderIsolatedTestRunner;
-import edu.illinois.NIOInspector.plugin.util.IsolatedURLClassLoader;
+import edu.illinois.NIOInspector.plugin.util.detection.ClassLoaderIsolatedTestRunner;
+import edu.illinois.NIOInspector.plugin.util.detection.IsolatedURLClassLoader;
 
 import java.io.File;
 import java.io.IOException;
@@ -207,6 +207,12 @@ public class RerunMojo extends AbstractMojo {
         }
     }
 
+    /**
+     * Parses the Surefire plugin configuration from a Maven project to extract the list of excluded test patterns.
+     * 
+     * @param project The Maven project from which to extract the Surefire plugin exclusions.
+     * @return A list of test patterns that are excluded by the Surefire plugin configuration.
+     */
     public static List<String> parseSurefireExcludes(MavenProject project) {
         List<String> excludedList = new ArrayList<>();
         Plugin surefirePlugin = project.getPlugin("org.apache.maven.plugins:maven-surefire-plugin");

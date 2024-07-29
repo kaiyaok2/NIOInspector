@@ -1,4 +1,4 @@
-package edu.illinois.NIOInspector.plugin.util;
+package edu.illinois.NIOInspector.plugin.util.detection;
 
 import org.apache.maven.plugin.MojoExecutionException;
 import org.junit.platform.launcher.Launcher;
@@ -213,7 +213,7 @@ public class ClassLoaderIsolatedTestRunner {
     }
 
     /**
-     * Convert the JUnit-Vintage-Engine-generated unique test ID to standard "class+method" format
+     * Convert the JUnit-generated unique test ID to standard "class+method" format
      *
      * @param input The unique test ID string
      * @return Test method name in the standard format (i.e. com.example.exampleTest#TestSomething)

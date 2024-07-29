@@ -11,6 +11,9 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 
+/**
+ * Mojo to download the Python script (as needed to invoke GPT-4 API):
+ */
 @Mojo(name = "downloadFixer")
 public class DownloadFixerMojo extends AbstractMojo {
 
@@ -20,6 +23,11 @@ public class DownloadFixerMojo extends AbstractMojo {
     @Parameter(property = "outputFile", defaultValue = "GPT_NIO_fixer.py")
     private String outputFile;
 
+    /**
+     * Executes the Mojo to download the LLM agent script.
+     *
+     * @throws MojoExecutionException if an error occurs during execution
+     */
     public void execute() throws MojoExecutionException {
         try {
             URL sourceUrl = new URL(url);

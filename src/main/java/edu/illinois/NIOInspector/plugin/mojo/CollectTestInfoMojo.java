@@ -1,6 +1,7 @@
 package edu.illinois.NIOInspector.plugin.mojo;
 
-import static edu.illinois.NIOInspector.plugin.util.StackTraceLineNumberExtractor.findLineNumberInStackTrace;
+import static edu.illinois.NIOInspector.plugin.util.extractors.StackTraceLineNumberExtractor.findLineNumberInStackTrace;
+import static edu.illinois.NIOInspector.plugin.util.extractors.MostRecentLogFinder.findMostRecentLog;
 
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -10,19 +11,13 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileFilter;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Date;
 import java.util.List;
-import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.text.SimpleDateFormat;
 
 /**
  * Mojo to collect three pieces of information from a previous rerun:
@@ -38,12 +33,6 @@ public class CollectTestInfoMojo extends AbstractMojo {
      */
     @Parameter(property = "logFile")
     private String logFilePath;
-
-    /**
-     * Directory to main source files, (i.e. src/main/...)
-     */
-    @Parameter(property = "sourceDirectory", defaultValue = "${project.build.sourceDirectory}")
-    private File sourceDirectory;
     
     /**
      * Directory to test source files. (i.e. src/test/...)
@@ -51,38 +40,17 @@ public class CollectTestInfoMojo extends AbstractMojo {
     @Parameter(property = "testSourceDirectory", defaultValue = "${project.build.testSourceDirectory}")
     private File testSourceDirectory;
 
-    private static final String LOG_DIRECTORY = ".NIOInspector";
-
     /**
-     * Find source test code w.r.t each possible NIO and reduce it
+     * Executes the Mojo to collect test information.
+     *
+     * @throws MojoExecutionException if an error occurs during execution
      */
     public void execute() throws MojoExecutionException {
         File logFile = null;
         // Log file not provided; default to file produced by most recent run
         if (logFilePath == null) {
             getLog().warn("Log not provided; uses most recent log.");
-
-            File logDirectory = new File(LOG_DIRECTORY);
-
-            // List all time-base named subdirectories in the .NIOInspector directory
-            File[] subdirectories = logDirectory.listFiles(File::isDirectory);
-
-            if (subdirectories != null) {
-                // Sort subdirectories by timestamp (descending order)
-                Arrays.sort(subdirectories, Comparator.comparingLong(this::getTimestampFromDirectory).reversed());
-
-                // Get the most recent directory
-                File mostRecentDirectory = subdirectories[0];
-
-                // Find the rerun-results.log file in the most recent directory
-                Optional<File> rerunResultsLogFileOptional = Arrays.stream(mostRecentDirectory.listFiles())
-                        .filter(file -> file.getName().equals("rerun-results.log"))
-                        .findFirst();
-
-                // Cast Optional<File> to File or throw exception if casting fails
-                logFile = rerunResultsLogFileOptional.orElseThrow(() ->
-                        new MojoExecutionException("Failed to find a recent rerun-results.log file"));
-            }
+            logFile = findMostRecentLog();
         } else {
             logFile = new File(logFilePath);
         }
@@ -108,9 +76,6 @@ public class CollectTestInfoMojo extends AbstractMojo {
         for (String possibleNIOTest : possibleNIOTests) {
             // Write reduced test code at method granularity
             writeReducedTestFile(possibleNIOTest, parentDirectory);
-
-            // Write most relevant source code
-            writeReducedSourceCode(possibleNIOTest, parentDirectory);
 
             // Write stacktrace of the failure in each rerun
             writeStackTrace(possibleNIOTest, parentDirectory, logFile);
@@ -215,23 +180,6 @@ public class CollectTestInfoMojo extends AbstractMojo {
                     }
                 }
             }
-        }
-    }
-
-    /**
-     * Get time stamp from the time-based directory name
-     * @param directory The directory with time-based name
-     * @return A comparable time stamp
-     */
-    private long getTimestampFromDirectory(File directory) {
-        try {
-            String timeBasedFileName = directory.getName();
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss");
-            Date creationTime = dateFormat.parse(timeBasedFileName);
-            return creationTime.getTime();
-        } catch (Exception e) {
-            getLog().error("Error parsing timestamp for directory: " + directory.getPath(), e);
-            return 0;
         }
     }
 
@@ -358,7 +306,7 @@ public class CollectTestInfoMojo extends AbstractMojo {
                     parentClass = matcher.group(2);
                     hasParentClass = true;
                 }
-                if (!methodStarted && line.trim().startsWith("@Test")) {
+                if (!methodStarted && (line.trim().startsWith("@Test") || line.trim().startsWith("@org.junit.Test"))) {
                     // Start of a test method
                     methodStarted = true;
                     allAnnotations.append(line).append(System.lineSeparator());
@@ -478,131 +426,5 @@ public class CollectTestInfoMojo extends AbstractMojo {
         } catch (IOException e) {
             getLog().error("Error reading file: " + testFile.getAbsolutePath(), e);
         }
-    }
-
-    /**
-     * Writes the most relevant source code w.r.t one possible NIO test
-     * @param possibleNIOTest The string containing class and method names.
-     * @param parentDirectory The parent directory of the files to be written.
-     */
-    private void writeReducedSourceCode(String possibleNIOTest, String parentDirectory) {
-        // Get the name of the class and find most related source file
-        String[] classPath = possibleNIOTest.split("#")[0].split("\\.");
-        String className = classPath[classPath.length - 1];
-        File sourceFile = null;
-        try {
-            sourceFile = findSourceFileForTestClass(className, sourceDirectory);
-        } catch (Exception e) {
-            getLog().error("Error finding most relevant source file.", e);
-        }
-
-        // Locate the folder to write source file content
-        String NIOTestName = possibleNIOTest.replace("#", ".");
-        File subDirectory = new File(parentDirectory + File.separator + NIOTestName);
-        if (!subDirectory.exists()) {
-            subDirectory.mkdir();
-        }
-
-        // Read the contents of the source file and write it to `sourceCode`
-        StringBuilder contentBuilder = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new FileReader(sourceFile))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                contentBuilder.append(line).append("\n");
-            }
-        } catch (Exception e) {
-            getLog().error("Error reading source file", e);
-        }
-        String sourceCode = contentBuilder.toString();
-        File outputFile = new File(subDirectory, "sourceCode");
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile))) {
-            writer.write(sourceCode);
-        } catch (Exception e) {
-            getLog().error("Error writing content in source file", e);
-        }
-    }
-
-    /**
-     * Finds the most relevant source file for a test class using the Levenshtein distance.
-     * @param testClassName the name of the test class
-     * @param sourceDirectory the directory to search for source files
-     * @return the most relevant source file, or null if no match is found
-     * @throws IOException if an I/O error occurs
-     */
-    private File findSourceFileForTestClass(String testClassName, File sourceDirectory) throws IOException {
-        List<File> sourceFiles = new ArrayList<>();
-
-        // Collect all source files
-        List<File> directoriesToProcess = new ArrayList<>();
-        directoriesToProcess.add(sourceDirectory);
-        while (!directoriesToProcess.isEmpty()) {
-            File currentDirectory = directoriesToProcess.remove(0);
-            File[] files = currentDirectory.listFiles(new FileFilter() {
-                @Override
-                public boolean accept(File file) {
-                    return file.isDirectory() || file.getName().endsWith(".java");
-                }
-            });
-
-            if (files != null) {
-                for (File file : files) {
-                    if (file.isDirectory()) {
-                        directoriesToProcess.add(file);
-                    } else {
-                        sourceFiles.add(file);
-                    }
-                }
-            }
-        }
-
-        // Extract base name of test class
-        String baseTestClassName = testClassName.replaceAll("Test$", "").replaceAll("TestCase$", "");
-
-        // Find best match using Levenshtein Distance
-        File bestMatch = null;
-        int bestScore = Integer.MAX_VALUE;
-
-        for (File file : sourceFiles) {
-            String fileName = file.getName();
-            String baseFileName = fileName.replace(".java", "");
-            int score = levenshteinDistance(baseTestClassName, baseFileName);
-
-            if (score < bestScore) {
-                bestScore = score;
-                bestMatch = file;
-            }
-        }
-
-        return bestMatch;
-    }
-
-    
-    
-    /**
-     * Calculates the Levenshtein distance(# single-character edits) between 2 strings
-     * @param a the first string
-     * @param b the second string
-     * @return the Levenshtein distance between the two strings
-     */
-    private int levenshteinDistance(String a, String b) {
-        int[][] dp = new int[a.length() + 1][b.length() + 1];
-
-        // dynamic programming with memoization
-        for (int i = 0; i <= a.length(); i++) {
-            for (int j = 0; j <= b.length(); j++) {
-                if (i == 0) {
-                    dp[i][j] = j;
-                } else if (j == 0) {
-                    dp[i][j] = i;
-                } else {
-                    dp[i][j] = Math.min(
-                        dp[i - 1][j - 1] + (a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1),
-                        Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1)
-                    );
-                }
-            }
-        }
-
-        return dp[a.length()][b.length()];
     }
 }

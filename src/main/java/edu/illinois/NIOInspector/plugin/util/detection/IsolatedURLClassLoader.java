@@ -1,4 +1,4 @@
-package edu.illinois.NIOInspector.plugin.util;
+package edu.illinois.NIOInspector.plugin.util.detection;
 
 import java.net.URL;
 import java.net.URLClassLoader;

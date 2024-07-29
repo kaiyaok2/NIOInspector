@@ -1,4 +1,4 @@
-package edu.illinois.NIOInspector.plugin.util;
+package edu.illinois.NIOInspector.plugin.util.logging;
 
 import ch.qos.logback.core.FileAppender;
 

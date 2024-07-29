@@ -1,4 +1,4 @@
-package edu.illinois.NIOInspector.plugin.util;
+package edu.illinois.NIOInspector.plugin.util.detection;
 
 import org.junit.platform.launcher.TestIdentifier;
 import org.junit.platform.launcher.TestPlan;

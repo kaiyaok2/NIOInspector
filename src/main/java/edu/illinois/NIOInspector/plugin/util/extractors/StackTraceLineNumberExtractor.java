@@ -1,4 +1,4 @@
-package edu.illinois.NIOInspector.plugin.util;
+package edu.illinois.NIOInspector.plugin.util.extractors;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -7,6 +7,9 @@ import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Supports extracting the line number of a source file as appearing in error stacktrace
+ */
 public class StackTraceLineNumberExtractor {
 
     /**
