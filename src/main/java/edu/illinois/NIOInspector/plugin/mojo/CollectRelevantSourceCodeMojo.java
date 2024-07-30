@@ -364,6 +364,7 @@ public class CollectRelevantSourceCodeMojo extends AbstractMojo {
         File outputFile = new File(subDirectory, "sourceCode");
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile))) {
             writer.write(sourceCode);
+            getLog().info("Possible relevant source file for " + possibleNIOTest + " written.");
         } catch (Exception e) {
             getLog().error("Error writing content in source file", e);
         }

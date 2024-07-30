@@ -20,6 +20,14 @@ public class CleanMojo extends AbstractMojo {
     private File projectBaseDirectory;
 
     /**
+     * Setter for projectBaseDirectory to use in tests
+     * @param projectBaseDirectory the base directory of the project
+     */
+    public void setProjectBaseDirectory(File projectBaseDirectory) {
+        this.projectBaseDirectory = projectBaseDirectory;
+    }
+    
+    /**
      * Check if the .NIOInspector directory exists, delete it if so
      */
     public void execute() {

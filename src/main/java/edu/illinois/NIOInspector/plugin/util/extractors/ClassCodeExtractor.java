@@ -36,18 +36,23 @@ public class ClassCodeExtractor {
         ParseResult<CompilationUnit> parseResult = parser.parse(file);
         CompilationUnit cu = parseResult.getResult().orElseThrow(() -> new IOException("Parsing failed"));
 
+        // Retrieve the package name, if present
+        String packageName = cu.getPackageDeclaration()
+                               .map(pd -> pd.getNameAsString() + ".")
+                               .orElse("");
+
         // Visit the class, interface, and enum declarations in the compilation unit
         cu.accept(new VoidVisitorAdapter<Void>() {
             @Override
             public void visit(ClassOrInterfaceDeclaration n, Void arg) {
                 super.visit(n, arg);
-                processDeclaration(n, cu, fileContent, classCodeMap);
+                processDeclaration(n, cu, fileContent, classCodeMap, packageName, "");
             }
 
             @Override
             public void visit(EnumDeclaration n, Void arg) {
                 super.visit(n, arg);
-                processDeclaration(n, cu, fileContent, classCodeMap);
+                processDeclaration(n, cu, fileContent, classCodeMap, packageName, "");
             }
         }, null);
 
@@ -61,15 +66,12 @@ public class ClassCodeExtractor {
      * @param cu The compilation unit containing the declaration.
      * @param fileContent The content of the Java source file as a string.
      * @param classCodeMap The map to store fully qualified class/interface names and their code.
+     * @param packageName The package name of the class/interface.
+     * @param parentName The name of the parent class, if any.
      */
-    private static void processDeclaration(ClassOrInterfaceDeclaration n, CompilationUnit cu, String fileContent, Map<String, String> classCodeMap) {
-        // Retrieve the package name, if present
-        String packageName = cu.getPackageDeclaration()
-                               .map(pd -> pd.getNameAsString() + ".")
-                               .orElse("");
-
-        // Combine the package name and class/interface name to form the fully qualified class/interface name
-        String className = packageName + n.getFullyQualifiedName().orElse(n.getNameAsString());
+    private static void processDeclaration(ClassOrInterfaceDeclaration n, CompilationUnit cu, String fileContent, Map<String, String> classCodeMap, String packageName, String parentName) {
+        // Combine the parent name and class/interface name to form the fully qualified class/interface name
+        String className = (parentName.isEmpty() ? "" : parentName + ".") + n.getNameAsString();
 
         // Determine the starting and ending lines of the class/interface in the source file
         int classBegin = n.getBegin().get().line - 1;
@@ -82,15 +84,18 @@ public class ClassCodeExtractor {
             classCode.append(fileLines[i]).append("\n");
         }
 
+        // Remove the simple class name entry if it exists
+        classCodeMap.remove(packageName + n.getNameAsString());
+
         // Store the fully qualified class/interface name and its code in the map
-        classCodeMap.put(className, classCode.toString().trim());
+        classCodeMap.put(packageName + className, classCode.toString().trim());
 
         // Process nested classes/interfaces/enums
         n.getMembers().forEach(member -> {
             if (member instanceof ClassOrInterfaceDeclaration) {
-                processDeclaration((ClassOrInterfaceDeclaration) member, cu, fileContent, classCodeMap);
+                processDeclaration((ClassOrInterfaceDeclaration) member, cu, fileContent, classCodeMap, packageName, className);
             } else if (member instanceof EnumDeclaration) {
-                processDeclaration((EnumDeclaration) member, cu, fileContent, classCodeMap);
+                processDeclaration((EnumDeclaration) member, cu, fileContent, classCodeMap, packageName, className);
             }
         });
     }
@@ -102,15 +107,12 @@ public class ClassCodeExtractor {
      * @param cu The compilation unit containing the declaration.
      * @param fileContent The content of the Java source file as a string.
      * @param classCodeMap The map to store fully qualified enum names and their code.
+     * @param packageName The package name of the enum.
+     * @param parentName The name of the parent class, if any.
      */
-    private static void processDeclaration(EnumDeclaration n, CompilationUnit cu, String fileContent, Map<String, String> classCodeMap) {
-        // Retrieve the package name, if present
-        String packageName = cu.getPackageDeclaration()
-                               .map(pd -> pd.getNameAsString() + ".")
-                               .orElse("");
-
-        // Combine the package name and enum name to form the fully qualified enum name
-        String className = packageName + n.getFullyQualifiedName().orElse(n.getNameAsString());
+    private static void processDeclaration(EnumDeclaration n, CompilationUnit cu, String fileContent, Map<String, String> classCodeMap, String packageName, String parentName) {
+        // Combine the parent name and enum name to form the fully qualified enum name
+        String className = (parentName.isEmpty() ? "" : parentName + ".") + n.getNameAsString();
 
         // Determine the starting and ending lines of the enum in the source file
         int classBegin = n.getBegin().get().line - 1;
@@ -123,15 +125,18 @@ public class ClassCodeExtractor {
             classCode.append(fileLines[i]).append("\n");
         }
 
+        // Remove the simple class name entry if it exists
+        classCodeMap.remove(packageName + n.getNameAsString());
+
         // Store the fully qualified enum name and its code in the map
-        classCodeMap.put(className, classCode.toString().trim());
+        classCodeMap.put(packageName + className, classCode.toString().trim());
 
         // Process nested classes/interfaces/enums
         n.getMembers().forEach(member -> {
             if (member instanceof ClassOrInterfaceDeclaration) {
-                processDeclaration((ClassOrInterfaceDeclaration) member, cu, fileContent, classCodeMap);
+                processDeclaration((ClassOrInterfaceDeclaration) member, cu, fileContent, classCodeMap, packageName, className);
             } else if (member instanceof EnumDeclaration) {
-                processDeclaration((EnumDeclaration) member, cu, fileContent, classCodeMap);
+                processDeclaration((EnumDeclaration) member, cu, fileContent, classCodeMap, packageName, className);
             }
         });
     }

@@ -58,7 +58,7 @@ public class MostRecentLogFinder {
      * @param directory The directory with time-based name
      * @return A comparable time stamp
      */
-    private static long getTimestampFromDirectory(File directory) {
+    public static long getTimestampFromDirectory(File directory) {
         try {
             String timeBasedFileName = directory.getName();
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss");

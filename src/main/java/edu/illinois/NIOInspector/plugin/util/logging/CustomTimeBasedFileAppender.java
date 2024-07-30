@@ -6,9 +6,15 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 /**
- * Custom appender that ensures each log of a rerun task is saved in a time-named sub-directory
+ * Custom appender that ensures each log of a rerun task is saved in a time-named sub-directory.
  */
 public class CustomTimeBasedFileAppender<E> extends FileAppender<E> {
+
+    /**
+     * Starts the appender. Constructs the log file path with the current timestamp and sets it.
+     * If the fileName is not set, logs an error.
+     * If an error occurs while creating the log file, logs the error.
+     */
     @Override
     public void start() {
         if (fileName != null) {

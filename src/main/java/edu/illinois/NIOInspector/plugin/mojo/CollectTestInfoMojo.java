@@ -60,7 +60,7 @@ public class CollectTestInfoMojo extends AbstractMojo {
         // Get a list of all possible NIO tests
         List<String> possibleNIOTests = getPossibleNIOTests(logFile);
         if (possibleNIOTests.isEmpty()) {
-            getLog().info("No error strings found");
+            getLog().warn("No error strings found");
             return;
         }
 

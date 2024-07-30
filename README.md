@@ -8,11 +8,13 @@ NIOInspector is a specialized Maven plugin designed to identify and fix non-idem
 - Maven 3.5+ (for detection).
 - Python 3.0+ (for test fixing).
 
-## Build
+## Build (Optional)
 
 To build the plugin, run:
 
     mvn clean install
+
+The plugin is released to Maven Central, so the commands below can be run without building locally.
 
 ## Detect NIO Flaky Tests
 
