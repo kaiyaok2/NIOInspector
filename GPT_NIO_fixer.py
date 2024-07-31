@@ -59,14 +59,14 @@ def generate_text(extra_prompt_text, max_tokens, buggy_java_test, source_code, s
             "If the test code contains enough information for a fix (i.e., a fix is possible without 'assuming' the existence / functionality of any methods)" +\
             ", please just answer `Directly Fixable` in your response; \n" +\
             "Otherwise, if you would like to explore the code for one specific custom method / constructor appearing in the test code, " +\
-            ", please just answer `Find Method Code: {className.methodName}` (e.g., `Need Method Code: {MyNIOClass.reset}`) in your response; \n" +\
+            ", please just answer `Find Method Code: {className.methodName}` (e.g., `Find Method Code: {MyNIOClass.reset}`) in your response; \n" +\
             "If you would like to explore the code for a specific custom class relevant to the test code, " +\
-            ", please just answer `Find Class Code: {className.methodName}` (e.g., `Need Class Code: {MyNIOClass}`) in your response; \n" +\
+            ", please just answer `Find Class Code: {className}` (e.g., `Find Class Code: {MyNIOClass}`) in your response; \n" +\
             "If want to explore all methods with names similar to a hypothesized name in any possibly relevant classes" +\
-            ", please just answer `Find Hypothesized Method: {possible.method.name}` (e.g., `Hypothesized Method: {resetDataSet}`) in your response; \n" +\
+            ", please just answer `Find Hypothesized Method: {possibleMethodName}` (e.g., `Find Hypothesized Method: {resetDataSet}`) in your response; \n" +\
             "If you generally need source code from more possibly relevant source files before you can make a decision, please just answer `Find Relevant File`. \n" +\
-            "In general, please just answer one of `Directly Fixable`, `Find Method Code: {className.methodName}`, `Find Class Code: {className.methodName}`," +\
-            "`Find Hypothesized Method: {possible.method.name}`, or `Find Relevant File`. Do not include any other text in your response."
+            "In general, please just answer one of `Directly Fixable`, `Find Method Code: {className.methodName}`, `Find Class Code: {className}`," +\
+            "`Find Hypothesized Method: {possibleMethodName}`, or `Find Relevant File`. Do not include any other text in your response."
     else:
         if source_code is not None:
             source_code_proving_prompt = "Below is part of the main code relevant to the test class - it may contain methods to clean up polluted states:```\n" +\
