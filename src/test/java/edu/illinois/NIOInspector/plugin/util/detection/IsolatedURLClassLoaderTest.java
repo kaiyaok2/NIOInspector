@@ -1,6 +1,7 @@
 package edu.illinois.NIOInspector.plugin.util.detection;
 
 import org.junit.jupiter.api.Test;
+
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.MalformedURLException;

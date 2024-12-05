@@ -3,6 +3,7 @@ package edu.illinois.NIOInspector.plugin.util.detection;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.launcher.TestIdentifier;
 import org.junit.platform.launcher.TestPlan;
+
 import org.junit.platform.engine.TestExecutionResult;
 
 import java.util.Map;

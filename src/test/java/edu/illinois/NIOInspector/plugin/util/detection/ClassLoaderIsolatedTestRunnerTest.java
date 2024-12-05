@@ -2,6 +2,7 @@ package edu.illinois.NIOInspector.plugin.util.detection;
 
 import org.apache.maven.plugin.MojoExecutionException;
 import org.junit.jupiter.api.Test;
+
 import java.lang.reflect.Method;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;

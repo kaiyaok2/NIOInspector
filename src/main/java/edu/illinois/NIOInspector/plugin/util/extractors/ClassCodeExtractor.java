@@ -140,14 +140,4 @@ public class ClassCodeExtractor {
             }
         });
     }
-
-    public static void main(String[] args) {
-        File file = new File("/Users/kekaiyao/Desktop/NIOInspector/src/main/java/edu/illinois/NIOInspector/plugin/util/extractors/MostRecentLogFinder.java");
-        try {
-            Map<String, String> classCodeMap = extractClassesWithCode(file);
-            classCodeMap.forEach((k, v) -> System.out.println(k + " => " + v));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 }

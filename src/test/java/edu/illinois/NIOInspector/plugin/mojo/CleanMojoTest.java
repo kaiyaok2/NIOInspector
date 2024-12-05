@@ -60,7 +60,7 @@ class CleanMojoTest {
         cleanMojo.execute();
 
         // Verify log message
-        verify(log).info(".NIOInspector directory does not exist.");
+        verify(log).warn(".NIOInspector directory does not exist.");
     }
 
     @Test

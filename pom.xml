@@ -31,11 +31,6 @@
         <developerConnection>scm:git:git@github.com:kaiyaok2/NIOInspector.git</developerConnection>
         <url>git@github.com:kaiyaok2/NIOInspector.git</url>
     </scm>
-    
-    <properties>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
-    </properties>
 
     <dependencies>
         <dependency>
@@ -109,8 +104,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.1</version>
                 <configuration>
-                    <source>${maven.compiler.source}</source>
-                    <target>${maven.compiler.target}</target>
+                    <source>1.8</source>
+                    <target>1.8</target>
                 </configuration>
             </plugin>
             <plugin>
@@ -184,7 +179,7 @@
                             <execution>
                                 <configuration>
                                     <executable>gpg2</executable>
-                                        <passphrase>XXX</passphrase>
+                                    <passphrase>XXX</passphrase>
                                 </configuration>
                                 <id>sign-artifacts</id>
                                 <phase>deploy</phase>

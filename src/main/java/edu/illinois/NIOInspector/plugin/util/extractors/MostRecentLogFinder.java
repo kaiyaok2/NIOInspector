@@ -30,7 +30,7 @@ public class MostRecentLogFinder {
         File logDirectory = new File(LOG_DIRECTORY);
         File logFile = null;
 
-        // List all time-base named subdirectories in the .NIOInspector directory
+        // List all time-base named subdirectories in the .NIODebugger directory
         File[] subdirectories = logDirectory.listFiles(File::isDirectory);
 
         if (subdirectories != null) {

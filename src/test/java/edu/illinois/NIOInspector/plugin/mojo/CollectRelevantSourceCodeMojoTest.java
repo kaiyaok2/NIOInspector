@@ -68,7 +68,7 @@ public class CollectRelevantSourceCodeMojoTest {
         Method method = CollectRelevantSourceCodeMojo.class.getDeclaredMethod("getMethodNameWithClassAndWithoutPackage", String.class);
         method.setAccessible(true);
 
-        String result = (String) method.invoke(mojo, "edu.illinois.NIOInspector.plugin.mojo.CollectRelevantSourceCodeMojo.execute");
+        String result = (String) method.invoke(mojo, "anonymized.path.plugin.mojo.CollectRelevantSourceCodeMojo.execute");
         method.setAccessible(false);
         assertEquals("CollectRelevantSourceCodeMojo.execute", result);
     }
@@ -78,7 +78,7 @@ public class CollectRelevantSourceCodeMojoTest {
         Method method = CollectRelevantSourceCodeMojo.class.getDeclaredMethod("getSimpleMethodName", String.class);
         method.setAccessible(true);
 
-        String result = (String) method.invoke(mojo, "edu.illinois.NIOInspector.plugin.mojo.CollectRelevantSourceCodeMojo");
+        String result = (String) method.invoke(mojo, "anonymized.path.plugin.mojo.CollectRelevantSourceCodeMojo");
         method.setAccessible(false);
         assertEquals("CollectRelevantSourceCodeMojo", result);
     }
@@ -88,9 +88,9 @@ public class CollectRelevantSourceCodeMojoTest {
         Method method = CollectRelevantSourceCodeMojo.class.getDeclaredMethod("splitString", String.class);
         method.setAccessible(true);
 
-        String[] result = (String[]) method.invoke(mojo, "edu.illinois.NIOInspector.plugin.mojo.CollectRelevantSourceCodeMojo");
+        String[] result = (String[]) method.invoke(mojo, "anonymized.path.plugin.mojo.CollectRelevantSourceCodeMojo");
         method.setAccessible(false);
-        assertArrayEquals(new String[]{"edu.illinois.NIOInspector.plugin.mojo", "CollectRelevantSourceCodeMojo"}, result);
+        assertArrayEquals(new String[]{"anonymized.path.plugin.mojo", "CollectRelevantSourceCodeMojo"}, result);
     }
 
     @Test

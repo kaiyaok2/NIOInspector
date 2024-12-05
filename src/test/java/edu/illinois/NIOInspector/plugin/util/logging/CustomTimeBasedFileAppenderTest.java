@@ -2,6 +2,7 @@ package edu.illinois.NIOInspector.plugin.util.logging;
 
 import ch.qos.logback.core.Layout;
 import ch.qos.logback.core.encoder.LayoutWrappingEncoder;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

@@ -1,16 +1,17 @@
 package edu.illinois.NIOInspector.plugin.mojo;
 
 
-import static edu.illinois.NIOInspector.plugin.util.extractors.ClassCodeExtractor.extractClassesWithCode;
-import static edu.illinois.NIOInspector.plugin.util.extractors.MethodCodeExtractor.extractImplementedMethodsWithCode;
-import static edu.illinois.NIOInspector.plugin.util.extractors.MostRecentLogFinder.findMostRecentLog;
-
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 
 import org.apache.maven.plugins.annotations.LifecyclePhase;
+
+import static edu.illinois.NIOInspector.plugin.util.extractors.ClassCodeExtractor.extractClassesWithCode;
+import static edu.illinois.NIOInspector.plugin.util.extractors.MethodCodeExtractor.extractImplementedMethodsWithCode;
+import static edu.illinois.NIOInspector.plugin.util.extractors.MostRecentLogFinder.findMostRecentLog;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -272,7 +273,7 @@ public class CollectRelevantSourceCodeMojo extends AbstractMojo {
     /**
      * Extracts the class+method name from a fully qualified method/class/interface/field/enum name.
      * 
-     * For example, "edu.illinois.NIOInspector.plugin.mojo.RerunMojo.execute" -> "RerunMojo.execute"
+     * For example, "anonymized.path.plugin.mojo.RerunMojo.execute" -> "RerunMojo.execute"
      * 
      * @param fullyQualifiedName The fully qualified name string.
      * @return class + method name
@@ -295,7 +296,7 @@ public class CollectRelevantSourceCodeMojo extends AbstractMojo {
     /**
      * Extracts the simple name from a fully qualified method/class/interface/field/enum name.
      * 
-     * @param fullyQualifiedName the fully qualified name, like `edu.illinois.NIOInspector.plugin.mojo.RerunMojo`
+     * @param fullyQualifiedName the fully qualified name, like `anonymized.path.plugin.mojo.RerunMojo`
      * @return simple method name without the package and class path, like `RerunMojo`
      */
     private String getSimpleMethodName(String fullyQualifiedName) {

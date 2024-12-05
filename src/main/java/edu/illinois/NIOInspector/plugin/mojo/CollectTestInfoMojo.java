@@ -1,13 +1,14 @@
 package edu.illinois.NIOInspector.plugin.mojo;
 
-import static edu.illinois.NIOInspector.plugin.util.extractors.StackTraceLineNumberExtractor.findLineNumberInStackTrace;
-import static edu.illinois.NIOInspector.plugin.util.extractors.MostRecentLogFinder.findMostRecentLog;
-
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
+
+import static edu.illinois.NIOInspector.plugin.util.extractors.MostRecentLogFinder.findMostRecentLog;
+import static edu.illinois.NIOInspector.plugin.util.extractors.StackTraceLineNumberExtractor.findLineNumberInStackTrace;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;

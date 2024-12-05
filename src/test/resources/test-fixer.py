@@ -1,0 +1,1 @@
+print("This is just a script to test the download fixer Mojo.")

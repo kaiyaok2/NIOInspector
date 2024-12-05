@@ -36,7 +36,7 @@ public class CleanMojo extends AbstractMojo {
             deleteDirectory(nioInspectordirectory);
             getLog().info("Deleted .NIOInspector directory.");
         } else {
-            getLog().info(".NIOInspector directory does not exist.");
+            getLog().warn(".NIOInspector directory does not exist.");
         }
     }
 
