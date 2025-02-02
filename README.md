@@ -1,6 +1,6 @@
 # NIOInspector (Maven Implementation of NIODebugger)
 
-NIOInspector is a specialized Maven plugin designed to identify and fix non-idempotent-outcome (NIO) flaky tests within Java projects. An NIO flaky test, due to self-polluting shared state, consistently passes in the initial run and fails in subsequent executions within the same environment. Links to our opened PRs to open source Maven projects with respect to NIO tests detected and patched by NIODebugger are collected in this[Google Spreadsheet](https://docs.google.com/spreadsheets/d/1ntSE-rlapzpmoKHGkBs4B110aaLL8Wd0nYj4Br5yQII/edit?usp=sharing).
+NIOInspector is a specialized Maven plugin designed to identify and fix non-idempotent-outcome (NIO) flaky tests within Java projects. An NIO flaky test, due to self-polluting shared state, consistently passes in the initial run and fails in subsequent executions within the same environment. Links to opened PRs with respect to NIO tests detected and patched by NIODebugger are collected in this [Google Spreadsheet](https://docs.google.com/spreadsheets/d/1ntSE-rlapzpmoKHGkBs4B110aaLL8Wd0nYj4Br5yQII/edit?usp=sharing).
 
 The `experiments/` folder contains the scripts to run the experiment at scale using NIOInspector.
 
