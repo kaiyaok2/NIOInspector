@@ -17,6 +17,8 @@ To build the plugin, run:
 
     mvn clean install
 
+You can skip building and directly use the [artifacts published to Maven Central](https://central.sonatype.com/artifact/edu.illinois/NIOInspector) following the steps below.
+
 ## Detect NIO Flaky Tests
 
 To detect NIO flaky tests in your project, execute the following command in the root directory of the target project (make sure you have already built your project):
