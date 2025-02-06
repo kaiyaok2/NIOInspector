@@ -62,7 +62,10 @@ def generate_text(extra_prompt_text, max_tokens, buggy_java_test, source_code, s
     common_prompt = "I have a non-idempotent test that always passes in the first run but fails in all repeated runs in the same JVM. " +\
         "In other words, the test has side effects and “self-pollutes” the state shared among test runs," +\
         "so only the first run succeeds. An example of a non-idempotent test is `void t1() { assertEquals(w, 0); w = 1; }`," +\
-        "and a fix is to reset `w` to `0`. Now here's the actual non-idempotent test `" +\
+        "and a fix is to reset `w` to `0`. If global state modification is inherently not cleanable (e.g, you cannot remove a class once loaded to a classloader)" +\
+        ", you shall ensure uniqueness for the relevant state. For example, `ClassGenerator.newInstance(Bean.class.getName())` is non-idempotent because one cannot" +\
+        "generate classes of same names multiple times. But since one cannot remove classes from classloaders, a possible fix would be" +\
+        "`ClassGenerator.newInstance(Bean.class.getName() + UUID.randomUUID().toString())`. Now here's the actual non-idempotent test `" +\
         test_name +\
         "` that I have:\n```\n" +\
         str(buggy_java_test) +\
@@ -100,7 +103,8 @@ def generate_text(extra_prompt_text, max_tokens, buggy_java_test, source_code, s
             source_code_proving_prompt +\
             "Please directly fix the non-idempotent test `" +\
             test_name +\
-            "`, and answer with only Java code of the fixed test. Do not include any explanation. Make sure you add import statements when needed." +\
+            "`, and answer with only Java code of the test class containing the fixed test. Do not include any explanation." +\
+            "Make sure your response is compilable as a Java file.  Make sure you add necessary import statements for your fix. " +\
             extra_prompt_text
     
     if mode == 'fix':
