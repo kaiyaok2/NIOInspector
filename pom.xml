@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>edu.illinois</groupId>
     <artifactId>NIOInspector</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
     <packaging>maven-plugin</packaging>
 
     <name>NIOInspector</name>
@@ -179,7 +179,7 @@
                             <execution>
                                 <configuration>
                                     <executable>gpg2</executable>
-                                    <passphrase>XXX</passphrase>
+                                    <passphrase>XXXXXXX</passphrase>
                                 </configuration>
                                 <id>sign-artifacts</id>
                                 <phase>deploy</phase>
