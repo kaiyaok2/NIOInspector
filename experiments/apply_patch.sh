@@ -24,11 +24,11 @@ while [ $retry_count -lt $max_retries ]; do
         else
             echo "Unsupported model. Not applying patches."
         fi
-    elif [ -f "../../../generate_compilable_patch.py" ]; then
+    elif [ -f "../../../.NIOInspector/generate_compilable_patch.py" ]; then
         if [[ "$2" == GPT* ]]; then
-            python3 ../../../generate_compilable_patch.py "$class_name" "$java_file_path" "$2" "$3"
+            python3 ../../../.NIOInspector/generate_compilable_patch.py "$class_name" "$java_file_path" "$2" "$3"
         elif [[ "$2" == DeepSeek* || "$2" == Qwen* ]]; then
-            python3 ../../../generate_compilable_patch.py "$class_name" "$java_file_path" "$2"
+            python3 ../../../.NIOInspector/generate_compilable_patch.py "$class_name" "$java_file_path" "$2"
         else
             echo "Unsupported model. Not applying patches."
         fi
