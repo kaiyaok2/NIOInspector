@@ -1,6 +1,6 @@
 # NIOInspector (Maven Implementation of NIODebugger)
 
-NIOInspector is a specialized Maven plugin designed to identify and fix non-idempotent-outcome (NIO) flaky tests within Java projects. An NIO flaky test, due to self-polluting shared state, consistently passes in the initial run and fails in subsequent executions within the same environment. Links to opened PRs with respect to NIO tests detected and patched by NIODebugger are collected in this [Google Spreadsheet](https://docs.google.com/spreadsheets/d/1ntSE-rlapzpmoKHGkBs4B110aaLL8Wd0nYj4Br5yQII/edit?usp=sharing).
+NIOInspector is a specialized Maven plugin designed to identify and fix non-idempotent-outcome (NIO) flaky tests within Java projects. An NIO flaky test, due to self-polluting shared state, consistently passes in the initial run and fails in subsequent executions within the same environment. Links to opened PRs with respect to NIO tests detected and patched by NIOInspector are collected in this [Google Spreadsheet](https://docs.google.com/spreadsheets/d/1ntSE-rlapzpmoKHGkBs4B110aaLL8Wd0nYj4Br5yQII/edit?usp=sharing).
 
 The `experiments/` folder contains the scripts to run the experiment at scale using NIOInspector.
 
@@ -21,7 +21,7 @@ You can skip building and directly use the [artifacts published to Maven Central
 
 ## Detect NIO Flaky Tests
 
-To detect NIO flaky tests in your project, execute the following command in the root directory of the target project (make sure you have already built your project):
+To detect NIO flaky tests in your project, first make sure you have already built your project (or module) beforehand. Then, execute the following command in the root directory of the target project (or module). 
 
     mvn edu.illinois:NIOInspector:rerun
 
@@ -29,9 +29,15 @@ Optional arguments:
 - Use `-Dtest=${path.to.testClass#testMethod}` to filter individual test classes or methods.
 - Use `-DnumReruns` to configure the number of reruns for each test.
 
-This command generates a `.NIOInspector` folder in the current directory, containing a folder for each execution timestamp (e.g., `2024-01-01-00-00-01`) with a `rerun-results.log` for debugging purposes.
+For all tests `${path.to.testClass#testMethod}` reported by NIOInspector, it is recommended to run
 
-## Fix NIO Flaky Tests
+    mvn edu.illinois:NIOInspector:rerun -Dtest=${path.to.testClass#testMethod} -DnumReruns=10
+
+to ensure if the reported test is not falsely labelled NIO but flaky due to other reasons, including non-determinism or test order dependency.
+
+The `rerun` task generates a `.NIOInspector` folder in the current directory, containing a folder for each execution timestamp (e.g., `2024-01-01-00-00-01`) with a `rerun-results.log` for debugging purposes.
+
+## Fix NIO Flaky Tests using an LLM Agent (Optional)
 
 ### Step 1: Download Fixer
 
@@ -56,7 +62,7 @@ Use the LLM-based agent to determine relevant source code for fixing NIO tests. 
 
     python3 .NIOInspector/fixer.py {model} decide_relevant_source_code {your_api_key_for_GPT}
 
-Notice that `{model}` can be one of `GPT4`, `GPT3.5`, `Qwen`, or `DeepSeek`. If you use non-gpt models, `{your_api_key_for_GPT}` is not needed. Notice that when you specify `DeepSeek`, `deepseek-coder-33b-instruct` is used; when you specify `Qwen`, `Qwen2.5-Coder-32B-Instruct` is used.
+Notice that `{model}` can be one of `GPT4`, `GPT3.5`, `Qwen`, or `DeepSeek`. If you use non-gpt models, `{your_api_key_for_GPT}` is not needed. Notice that when you specify `DeepSeek`, `deepseek-coder-33b-instruct` is used; when you specify `Qwen`, `Qwen2.5-Coder-32B-Instruct` is used. We have only tested NIOInspector under the LLMs mentioned above, but users can modify `.NIOInspector/fixer.py` to make use of other LLMs.
 
 Optional arguments:
 - Use `-timestamp=${xxxx-xx-xx-xx-xx-xx}` to specify a certain run for detection (default uses the most recent rerun).
