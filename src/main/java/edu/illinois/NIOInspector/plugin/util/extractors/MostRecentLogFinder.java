@@ -37,17 +37,26 @@ public class MostRecentLogFinder {
             // Sort subdirectories by timestamp (descending order)
             Arrays.sort(subdirectories, Comparator.comparingLong(MostRecentLogFinder::getTimestampFromDirectory).reversed());
 
-            // Get the most recent directory
-            File mostRecentDirectory = subdirectories[0];
-
-            // Find the rerun-results.log file in the most recent directory
-            Optional<File> rerunResultsLogFileOptional = Arrays.stream(mostRecentDirectory.listFiles())
-                    .filter(file -> file.getName().equals("rerun-results.log"))
-                    .findFirst();
-
-            // Cast Optional<File> to File or throw exception if casting fails
-            logFile = rerunResultsLogFileOptional.orElseThrow(() ->
-                    new MojoExecutionException("Failed to find a recent rerun-results.log file"));
+            // Pick the most recent directory containing a non-empty rerun-results.log.
+            // Logback contexts spawned by the project under test (e.g. per-deployment
+            // classloaders) can create spurious newer timestamp directories holding an
+            // empty log - those must be skipped, not treated as the latest run.
+            for (File directory : subdirectories) {
+                File[] files = directory.listFiles();
+                if (files == null) {
+                    continue;
+                }
+                Optional<File> rerunResultsLogFileOptional = Arrays.stream(files)
+                        .filter(file -> file.getName().equals("rerun-results.log") && file.length() > 0)
+                        .findFirst();
+                if (rerunResultsLogFileOptional.isPresent()) {
+                    logFile = rerunResultsLogFileOptional.get();
+                    break;
+                }
+            }
+            if (logFile == null) {
+                throw new MojoExecutionException("Failed to find a recent rerun-results.log file");
+            }
         }
 
         return logFile;

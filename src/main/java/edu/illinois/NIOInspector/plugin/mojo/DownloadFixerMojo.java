@@ -12,25 +12,29 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
 
 /**
- * Mojo to download the required scripts (fixer.py, apply_patch.sh, generate_diff.py):
+ * Mojo to install the LLM fixer scripts (fixer.py, react_agent.py) into the
+ * local .NIOInspector directory.
+ *
+ * The scripts are bundled as resources in the plugin jar, so the installed
+ * scripts always match the plugin version in use. If a bundled copy is
+ * missing (e.g. a stripped-down build of the plugin), the Mojo falls back to
+ * downloading the scripts from the NIOInspector GitHub repository.
  */
 @Mojo(name = "downloadFixer")
 public class DownloadFixerMojo extends AbstractMojo {
 
-    private final String[] fileUrls = {
-        "https://raw.githubusercontent.com/kaiyaok2/NIOInspector/main/fixer.py",
-        "https://raw.githubusercontent.com/kaiyaok2/NIOInspector/main/experiments/apply_patch.sh",
-        "https://raw.githubusercontent.com/kaiyaok2/NIOInspector/main/experiments/generate_compilable_patch.py"
+    private String[] fileNames = {
+        "fixer.py",
+        "react_agent.py"
     };
 
-    private final String[] fileNames = {
-        "fixer.py",
-        "apply_patch.sh",
-        "generate_compilable_patch.py"
+    private String[] fileUrls = {
+        "https://raw.githubusercontent.com/kaiyaok2/NIOInspector/main/fixer.py",
+        "https://raw.githubusercontent.com/kaiyaok2/NIOInspector/main/react_agent.py"
     };
 
     /**
-     * Executes the Mojo to download the required scripts.
+     * Executes the Mojo to install the required scripts.
      *
      * @throws MojoExecutionException if an error occurs during execution
      */
@@ -40,8 +44,33 @@ public class DownloadFixerMojo extends AbstractMojo {
             throw new MojoExecutionException("Failed to create directory: " + nioInspectorDir.getAbsolutePath());
         }
 
-        for (int i = 0; i < fileUrls.length; i++) {
-            downloadFile(fileUrls[i], new File(nioInspectorDir, fileNames[i]));
+        for (int i = 0; i < fileNames.length; i++) {
+            File targetFile = new File(nioInspectorDir, fileNames[i]);
+            if (extractBundledScript(fileNames[i], targetFile)) {
+                getLog().info("Installed bundled script: " + targetFile.getAbsolutePath());
+            } else {
+                downloadFile(fileUrls[i], targetFile);
+            }
+        }
+    }
+
+    /**
+     * Copies a script bundled in the plugin jar (under /fixer-scripts) to the target file.
+     *
+     * @param scriptName the name of the bundled script
+     * @param targetFile the file object representing the target location
+     * @return true if the bundled script was found and copied, false otherwise
+     * @throws MojoExecutionException if the bundled script exists but cannot be copied
+     */
+    private boolean extractBundledScript(String scriptName, File targetFile) throws MojoExecutionException {
+        try (InputStream inputStream = getClass().getResourceAsStream("/fixer-scripts/" + scriptName)) {
+            if (inputStream == null) {
+                return false;
+            }
+            copyStream(inputStream, targetFile);
+            return true;
+        } catch (IOException e) {
+            throw new MojoExecutionException("Error occurred while extracting bundled script: " + scriptName, e);
         }
     }
 
@@ -65,18 +94,29 @@ public class DownloadFixerMojo extends AbstractMojo {
                 connection = openConnection(sourceUrl);
             }
 
-            try (InputStream inputStream = connection.getInputStream();
-                 FileOutputStream outputStream = new FileOutputStream(targetFile)) {
-
-                byte[] buffer = new byte[1024];
-                int bytesRead;
-                while ((bytesRead = inputStream.read(buffer)) != -1) {
-                    outputStream.write(buffer, 0, bytesRead);
-                }
+            try (InputStream inputStream = connection.getInputStream()) {
+                copyStream(inputStream, targetFile);
                 getLog().info("File downloaded successfully: " + targetFile.getAbsolutePath());
             }
         } catch (IOException e) {
             throw new MojoExecutionException("Error occurred while downloading file: " + targetFile.getName(), e);
+        }
+    }
+
+    /**
+     * Copies an input stream to a target file.
+     *
+     * @param inputStream the stream to copy from
+     * @param targetFile the file to write to
+     * @throws IOException if an I/O error occurs
+     */
+    private void copyStream(InputStream inputStream, File targetFile) throws IOException {
+        try (FileOutputStream outputStream = new FileOutputStream(targetFile)) {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
         }
     }
 
@@ -95,4 +135,3 @@ public class DownloadFixerMojo extends AbstractMojo {
         return connection;
     }
 }
-

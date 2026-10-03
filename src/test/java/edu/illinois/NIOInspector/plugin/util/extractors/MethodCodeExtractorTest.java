@@ -162,7 +162,10 @@ public class MethodCodeExtractorTest {
 
         Map<String, String> methodCodeMap = MethodCodeExtractor.extractImplementedMethodsWithCode(tempFile);
 
-        assertEquals(5, methodCodeMap.size());
+        // javaparser >= 3.24 reports the implicit `public abstract` modifiers on interface
+        // methods, so the (body-less) interface method is now included as intended.
+        assertEquals(6, methodCodeMap.size());
+        assertTrue(methodCodeMap.containsKey("test.OuterClass.InnerInterface.interfaceMethod"));
         assertTrue(methodCodeMap.containsKey("test.OuterClass.OuterClass"));
         assertTrue(methodCodeMap.containsKey("test.OuterClass.method1"));
         assertTrue(methodCodeMap.containsKey("test.OuterClass.StaticClass.StaticClass"));

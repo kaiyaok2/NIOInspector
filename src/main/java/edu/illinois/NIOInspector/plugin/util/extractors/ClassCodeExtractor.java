@@ -1,6 +1,7 @@
 package edu.illinois.NIOInspector.plugin.util.extractors;
 
 import com.github.javaparser.JavaParser;
+import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.ParseResult;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
@@ -32,7 +33,8 @@ public class ClassCodeExtractor {
         String fileContent = new String(Files.readAllBytes(file.toPath()));
 
         // Initialize the JavaParser and parse the file to get a CompilationUnit
-        JavaParser parser = new JavaParser();
+        JavaParser parser = new JavaParser(new ParserConfiguration()
+            .setLanguageLevel(ParserConfiguration.LanguageLevel.BLEEDING_EDGE));
         ParseResult<CompilationUnit> parseResult = parser.parse(file);
         CompilationUnit cu = parseResult.getResult().orElseThrow(() -> new IOException("Parsing failed"));
 

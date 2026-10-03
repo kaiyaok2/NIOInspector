@@ -11,8 +11,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.HashMap;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
@@ -21,14 +19,16 @@ class DownloadFixerMojoTest {
 
     private DownloadFixerMojo mojo;
     private Log mockLog;
-    private Map<String, File> tempFiles;
     private File nioInspectorDir;
+
+    private final String[] fileNames = {"fixer.py", "react_agent.py"};
 
     @BeforeEach
     public void setUp() throws Exception {
         mojo = new DownloadFixerMojo() {
             @Override
             protected HttpURLConnection openConnection(URL url) throws IOException {
+                // The GitHub fallback must not be reached when scripts are bundled
                 HttpURLConnection mockConnection = mock(HttpURLConnection.class);
                 String fileName = url.toString().substring(url.toString().lastIndexOf('/') + 1);
                 InputStream mockInputStream = getClass().getClassLoader().getResourceAsStream("test-" + fileName);
@@ -51,32 +51,22 @@ class DownloadFixerMojoTest {
         nioInspectorDir.mkdirs();
         nioInspectorDir.deleteOnExit();
 
-        // Create temporary files for each download
-        tempFiles = new HashMap<>();
-        String[] fileNames = {"fixer.py", "apply_patch.sh", "generate_compilable_patch.py"};
         for (String fileName : fileNames) {
-            File tempFile = new File(nioInspectorDir, fileName);
-            tempFile.deleteOnExit();
-            tempFiles.put(fileName, tempFile);
+            File installed = new File(nioInspectorDir, fileName);
+            installed.delete();
+            installed.deleteOnExit();
         }
-
-        setPrivateField(mojo, "fileUrls", new String[]{
-            "https://example.com/fixer.py",
-            "https://example.com/apply_patch.sh",
-            "https://example.com/generate_compilable_patch.py"
-        });
-        setPrivateField(mojo, "fileNames", fileNames);
     }
 
     @Test
-    void testExecute() throws MojoExecutionException {
+    void testExecuteInstallsBundledScripts() throws MojoExecutionException {
         mojo.execute();
 
-        // Verify all files are downloaded correctly
-        for (Map.Entry<String, File> entry : tempFiles.entrySet()) {
-            File file = new File(nioInspectorDir, entry.getKey());
-            assertTrue(file.exists(), "The file " + file.getName() + " should be downloaded.");
-            assertTrue(file.length() > 0, "The file " + file.getName() + " should not be empty.");
+        // Verify all scripts are installed from the bundled plugin resources
+        for (String fileName : fileNames) {
+            File file = new File(nioInspectorDir, fileName);
+            assertTrue(file.exists(), "The script " + file.getName() + " should be installed.");
+            assertTrue(file.length() > 0, "The script " + file.getName() + " should not be empty.");
         }
 
         // Capture and verify log messages
@@ -84,24 +74,10 @@ class DownloadFixerMojoTest {
         verify(mockLog, atLeastOnce()).info(logCaptor.capture());
         for (String logMessage : logCaptor.getAllValues()) {
             assertTrue(
-                logMessage.contains("File downloaded successfully: "),
-                "Log message should indicate successful download."
+                logMessage.contains("Installed bundled script: ")
+                    || logMessage.contains("File downloaded successfully: "),
+                "Log message should indicate successful installation."
             );
         }
-    }
-
-    private void setPrivateField(Object target, String fieldName, Object value) throws Exception {
-        Class<?> clazz = target.getClass();
-        while (clazz != null) {
-            try {
-                java.lang.reflect.Field field = clazz.getDeclaredField(fieldName);
-                field.setAccessible(true);
-                field.set(target, value);
-                return;
-            } catch (NoSuchFieldException e) {
-                clazz = clazz.getSuperclass();
-            }
-        }
-        throw new NoSuchFieldException("Field " + fieldName + " not found in class hierarchy.");
     }
 }

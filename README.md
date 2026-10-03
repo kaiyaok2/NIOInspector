@@ -4,12 +4,22 @@ NIOInspector is a specialized Maven plugin designed to identify and fix non-idem
 
 The `experiments/` folder contains the scripts to run the experiment at scale using NIOInspector.
 
+## What's New in 2.0
+
+- **Modern LLM backend.** The fixer now uses Claude (default: Claude Sonnet 4.5 via AWS Bedrock) instead of the retired GPT-3.5/GPT-4 and local DeepSeek/Qwen models.
+- **Whole-file fix generation (Step 5).** With today's long model contexts, the fixer generates a complete, compilable replacement of the entire test file rather than a method-level snippet patch, eliminating the fragile "make the patch compilable" post-processing step.
+- **ReACT repair agent (Step 6).** The shell-script-based patch application and reflection loop is replaced by a small ReACT agent (`react_agent.py`) that applies the candidate fix, re-runs the detection phase, and iterates on the execution traces (compiler errors, stack traces, rerun logs) until detection reports success.
+- **Newer Java support.** The detector builds and runs on current JDKs (11 through 21+); test-source parsing handles modern Java language syntax.
+
 ## Prerequisites
 
-- Java 9 to 21 (for detection).
-- Maven 3.5+ (for detection).
-- Python 3.0+ (for test fixing).
-- Required Python Packages: openai (for GPT-based test fixing, recommended); transformers & torch (for DeepSeek Coder-based or Qwen Coder-based test fixing). GPU access is recommended for open-source models for efficiency.
+- Java 11 to 21+ and Maven 3.5+ (for detection).
+- Python 3.9+ with the `anthropic[bedrock]` package (for test fixing): `pip install "anthropic[bedrock]"`.
+- AWS credentials with Amazon Bedrock access to Claude Sonnet 4.5 (`us.anthropic.claude-sonnet-4-5-20250929-v1:0`). Either of:
+  - an Amazon Bedrock API key (set `AWS_BEARER_TOKEN_BEDROCK`, or pass the key as the third CLI argument), or
+  - standard AWS SigV4 credentials (environment variables, or a profile selected with `NIO_AWS_PROFILE`).
+
+  The Bedrock region is taken from `NIO_BEDROCK_REGION` / `AWS_REGION` (default `us-east-2`).
 
 ## Build (Optional)
 
@@ -21,7 +31,7 @@ You can skip building and directly use the [artifacts published to Maven Central
 
 ## Detect NIO Flaky Tests
 
-To detect NIO flaky tests in your project, first make sure you have already built your project (or module) beforehand. Then, execute the following command in the root directory of the target project (or module). 
+To detect NIO flaky tests in your project, first make sure you have already built your project (or module) beforehand. Then, execute the following command in the root directory of the target project (or module).
 
     mvn edu.illinois:NIOInspector:rerun
 
@@ -41,7 +51,7 @@ The `rerun` task generates a `.NIOInspector` folder in the current directory, co
 
 ### Step 1: Download Fixer
 
-Run the following command to download the Python scripts for fixing:
+Run the following command to install the Python scripts for fixing (`fixer.py` and `react_agent.py`, bundled with the plugin):
 
     mvn edu.illinois:NIOInspector:downloadFixer
 
@@ -60,9 +70,9 @@ This command collects a list of potential NIO tests along with their stack trace
 
 Use the LLM-based agent to determine relevant source code for fixing NIO tests. Run:
 
-    python3 .NIOInspector/fixer.py {model} decide_relevant_source_code {your_api_key_for_GPT}
+    python3 .NIOInspector/fixer.py Sonnet4.5 decide_relevant_source_code
 
-Notice that `{model}` can be one of `GPT4`, `GPT3.5`, `Qwen`, or `DeepSeek`. If you use non-gpt models, `{your_api_key_for_GPT}` is not needed. Notice that when you specify `DeepSeek`, `deepseek-coder-33b-instruct` is used; when you specify `Qwen`, `Qwen2.5-Coder-32B-Instruct` is used. We have only tested NIOInspector under the LLMs mentioned above, but users can modify `.NIOInspector/fixer.py` to make use of other LLMs.
+The model argument may be `Sonnet4.5` (the default alias) or any Bedrock Claude model ID / inference profile. An Amazon Bedrock API key may be passed as an optional third argument (otherwise the standard AWS credential chain is used).
 
 Optional arguments:
 - Use `-timestamp=${xxxx-xx-xx-xx-xx-xx}` to specify a certain run for detection (default uses the most recent rerun).
@@ -76,31 +86,32 @@ Run the following command to gather relevant source code based on the advice fro
 Optional arguments:
 - Use `-logFile=${path.to.most.recent.log}` to specify a certain run for detection (default uses the most recent rerun).
 
-### Step 5: Generating patches for NIO Tests
+### Step 5: Generating Fixes for NIO Tests
 
-Finally, use an LLM to generate fixes for detected NIO tests based on gathered information. Run:
+Use the LLM to generate fixes for detected NIO tests based on gathered information. Run:
 
-    python3 .NIOInspector/fixer.py {model} fix {your_api_key_for_GPT}
+    python3 .NIOInspector/fixer.py Sonnet4.5 fix
 
-Similarly, `{model}` can be one of `GPT4`, `GPT3.5`, `Qwen`, or `DeepSeek`. If you use non-gpt models, `{your_api_key_for_GPT}` is not needed.
+For each possible NIO test this generates a complete fixed version of the whole test file, stored in `.NIOInspector/{timestamp}/{full_path_test_name}/patch.txt`.
 
 Optional arguments:
 - Use `-timestamp=${xxxx-xx-xx-xx-xx-xx}` to specify a certain run for detection (default uses the most recent rerun).
-- Use `-max_tokens={num_tokens}` to configure the maximum number of tokens in the patch (default is 1000).
+- Use `-max_tokens={num_tokens}` to configure the maximum number of output tokens (default is 60000).
 - Use `-extra_prompt={your_prompt}` for additional ad hoc requirements (e.g., "Do not add comments", default is empty string).
 
-This command generates a patch for each of the possible NIO test, stored in `.NIOInspector/{timestamp}/{full_path_test_name}/patch.txt`.
+### Step 6 (Optional but Recommended): ReACT Agent - Apply, Verify, and Iterate
 
-### Step 6 (Optional): Applying Patches & Reflection with Feedback-Based Iterative Prompting
+Users have the option to either apply the generated fix manually (to ensure adherence to coding style, etc.) or let the ReACT agent automate the whole apply-verify-refine loop. From the root directory of the target project (or module), run:
 
-Users have the option to either apply the patch manually (to ensure adherence to coding style, etc.) or automate the process using the LLM. To apply the patch automatically, use the following command:
+    python3 .NIOInspector/react_agent.py Sonnet4.5
 
-```bash
-    cd .NIOInspector/{timestamp}/{full_path_test_name}
-    ../../../.NIOInspector/apply_patch.sh ../../.. {model} {your_api_key_for_GPT}
-```
-Similarly, `{model}` can be one of `GPT4`, `GPT3.5`, `Qwen`, or `DeepSeek`. If you use non-gpt models, `{your_api_key_for_GPT}` is not needed.
+For every test in `possible-NIO-list.txt` the agent applies the candidate fix from Step 5, re-runs the NIOInspector detection phase, and - if the test is still flaky, broken, or does not compile - iterates on the execution traces using filesystem and Maven tools until detection reports success or the budget is exhausted. Fixes are kept only when detection confirms success; otherwise all touched files are restored.
 
-Due to the high cost of using GPT-4, reflection with feedback-based iterative prompting is not a mandatory step in the patch generation pipeline. However, if the test flakiness is not resolved after applying the patch and rebuilding the project, users can simply rerun the detection phase and repeat steps 2-5 above. NIOInspector will re-enter the fixer phase with the prompt automatically enhanced by the (most recent) previous relevant source code selection, patch, and execution results.
+Optional arguments:
+- Use `-test=${path.to.testClass#testMethod}` to repair a single test.
+- Use `-max_detection_runs={N}` to set the per-test detection budget (default 4).
+- Use `-numReruns={N}` reruns per detection (default 3).
+- Use `-mvn_timeout={seconds}` timeout per Maven invocation (default 1800).
+- Use `-plugin={groupId:artifactId:version}` to pin the plugin coordinates.
 
-If you're aware of the cost of the LLMs and still want to fully automate the reflection process, you can use the `experiments/run_plugin_at_scale.sh` script, which allow up to three iterations for each test.
+Per-test artifacts (verdict, transcript, final fixed files) are stored in `.NIOInspector/{timestamp}/{full_path_test_name}/react_agent_*.json`.

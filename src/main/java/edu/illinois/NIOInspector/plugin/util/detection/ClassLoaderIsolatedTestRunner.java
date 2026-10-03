@@ -110,6 +110,33 @@ public class ClassLoaderIsolatedTestRunner {
         CustomSummaryGeneratingListener listener = new CustomSummaryGeneratingListener();
         launcher.registerTestExecutionListeners(listener);
 
+        // Some NIO tests self-pollute state that only makes *background* threads
+        // fail in reruns (e.g. an assertion inside a thread-pool worker), which
+        // JUnit never observes. Track uncaught background-thread exceptions and
+        // attribute them to the test running at that moment, so such tests can
+        // still be reported under the same passes-first/fails-later principle.
+        final Map<String, Integer> backgroundFailuresThisRun = new java.util.concurrent.ConcurrentHashMap<>();
+        final Thread.UncaughtExceptionHandler previousHandler = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+            // Prefer the currently running test; fall back to the most recently
+            // finished one (a polluted worker thread often dies just after its
+            // test method has already returned).
+            String attributedTest = listener.getCurrentTestUniqueId();
+            if (attributedTest == null) {
+                attributedTest = listener.getLastFinishedTestUniqueId();
+            }
+            if (attributedTest != null) {
+                String testString = extractTestMethod(attributedTest);
+                backgroundFailuresThisRun.merge(testString, 1, Integer::sum);
+                logger.warn("Failing Test: " + testString + " (uncaught failure in background thread " +
+                    thread.getName() + ")");
+                logger.warn("Failure message: ", throwable);
+            } else {
+                logger.warn("Uncaught exception in background thread " + thread.getName() +
+                    " (no test attributable)", throwable);
+            }
+        });
+
         // Select classes or methods to run
         LauncherDiscoveryRequestBuilder requestBuilder = LauncherDiscoveryRequestBuilder.request();
         for (Class<?> testClass : classesToRunAllTests) {
@@ -128,23 +155,27 @@ public class ClassLoaderIsolatedTestRunner {
         launcher.execute(requestBuilder.build());
         final Map<String, Boolean> testStatusInFirstRun = new HashMap<>(listener.getTestPassStatus());
         TestExecutionSummary summary = listener.getSummary();
+        final long testsStartedInFirstRun = summary.getTestsStartedCount();
+        final Map<String, Integer> backgroundFailuresInFirstRun = new HashMap<>(backgroundFailuresThisRun);
         printSummary(summary);
 
         // Reruns
         Map<String, Integer> flakyTests = new HashMap<>();
         Map<String, Integer> NIOTests = new HashMap<>();
         Map<String, Integer> NDTests = new HashMap<>();
+        Map<String, Integer> backgroundFlakyTests = new HashMap<>();
         for (int i = 0; i < numReruns; i++) {
             logger.info("");
             logger.info("=======================Starting Rerun #" + (i + 1) + "=========================");
             logger.info("");
+            backgroundFailuresThisRun.clear();
             launcher.execute(requestBuilder.build());
             summary = listener.getSummary();
             summary.getFailures().forEach(failure -> {
                 TestIdentifier testIdentifier = failure.getTestIdentifier();
                 String testUniqueId = testIdentifier.getUniqueId();
                 String testString = extractTestMethod(testUniqueId);
-                if (testStatusInFirstRun.containsKey(testUniqueId) && 
+                if (testStatusInFirstRun.containsKey(testUniqueId) &&
                     testStatusInFirstRun.get(testUniqueId)) {
                         // Test passed in the first iteration but failed in later iteration
                         if (flakyTests.containsKey(testString)) {
@@ -154,7 +185,27 @@ public class ClassLoaderIsolatedTestRunner {
                         }
                 }
             });
+            // Tests whose rerun failures surface only in background threads:
+            // count them when the first run had no such background failure
+            for (String testString : backgroundFailuresThisRun.keySet()) {
+                if (!backgroundFailuresInFirstRun.containsKey(testString)) {
+                    backgroundFlakyTests.merge(testString, 1, Integer::sum);
+                }
+            }
             printSummary(summary);
+        }
+        Thread.setDefaultUncaughtExceptionHandler(previousHandler);
+
+        // Tests flagged only through the background-thread channel. Observation
+        // on this channel is inherently lossy (an async failure can land between
+        // runs and miss attribution), so presence in any rerun - with a clean
+        // first run - is reported as possible NIO rather than requiring failure
+        // in every rerun.
+        Map<String, Integer> backgroundOnlyFlakyTests = new HashMap<>();
+        for (Map.Entry<String, Integer> entry : backgroundFlakyTests.entrySet()) {
+            if (!flakyTests.containsKey(entry.getKey())) {
+                backgroundOnlyFlakyTests.put(entry.getKey(), entry.getValue());
+            }
         }
 
         // Log final results (possible NIO tests)
@@ -166,24 +217,35 @@ public class ClassLoaderIsolatedTestRunner {
                 NIOTests.put(entry.getKey(), entry.getValue());
             }
         }
+        NIOTests.putAll(backgroundOnlyFlakyTests);
+        flakyTests.putAll(backgroundOnlyFlakyTests);
         logger.info("");
         logger.info("=========================Final Results=========================");
         logger.info("");
-        if (flakyTests.isEmpty()) {
+        if (testsStartedInFirstRun == 0) {
+            // Do not report "No Flaky Tests Found" when nothing actually ran -
+            // that would be a false negative (e.g. stale or missing test classes).
+            logger.error("No tests were executed - ensure the test classes are compiled " +
+                "(e.g. run `mvn process-test-classes`) and the selected tests exist.");
+        } else if (flakyTests.isEmpty()) {
             logger.info("No Flaky Tests Found");
         } else {
             if (!NIOTests.isEmpty()) {
                 logger.error("Number of Possible NIO Test(s) Found: " + NIOTests.size());
                 for (Map.Entry<String, Integer> NIOEntry : NIOTests.entrySet()) {
+                    String channel = backgroundOnlyFlakyTests.containsKey(NIOEntry.getKey())
+                        ? " via background-thread failures" : "";
                     logger.error(NIOEntry.getKey() + " (passed in the initial run but failed in " +
-                        NIOEntry.getValue() + " out of " + numReruns + " reruns)");
+                        NIOEntry.getValue() + " out of " + numReruns + " reruns" + channel + ")");
                 }
             }
             if (!NDTests.isEmpty()) {
                 logger.warn("Number of Non-deterministic Flaky Test(s) Found: " + NDTests.size());
                 for (Map.Entry<String, Integer> NDEntry : NDTests.entrySet()) {
+                    String channel = backgroundOnlyFlakyTests.containsKey(NDEntry.getKey())
+                        ? " via background-thread failures" : "";
                     logger.warn(NDEntry.getKey() + " (passed in the initial run but failed in " +
-                        NDEntry.getValue() + " out of " + numReruns + " reruns)");
+                        NDEntry.getValue() + " out of " + numReruns + " reruns" + channel + ")");
                 }
             }
         }

@@ -66,6 +66,8 @@ public class RerunMojo extends AbstractMojo {
      */
     public void execute() throws MojoExecutionException {
 
+        ensurePluginLogbackConfiguration();
+
         List<String> testClassNames = new ArrayList<>();
         Map<String, List<String>> classStringToMethodsMap = new HashMap<>();
         if (!(test == null) && !test.isEmpty()) {
@@ -156,6 +158,38 @@ public class RerunMojo extends AbstractMojo {
             runMethod.invoke(testRunner, testClassNames, classStringToMethodsMap, classLoader, numReruns);
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
             throw new MojoExecutionException("Error invoking ClassLoaderIsolatedTestRunner", e);
+        }
+    }
+
+    /**
+     * Forces the plugin's bundled logback configuration for the test reruns.
+     *
+     * Many projects ship their own logback-test.xml on the test classpath;
+     * inside the isolated classloader that file would win over the plugin's
+     * logback.xml, so the CustomTimeBasedFileAppender writing
+     * .NIOInspector/{timestamp}/rerun-results.log would never engage and the
+     * downstream collectTestInfo goal would find no log. Point
+     * logback.configurationFile at an extracted copy of the bundled config
+     * unless the user already set it explicitly.
+     */
+    private void ensurePluginLogbackConfiguration() {
+        if (System.getProperty("logback.configurationFile") != null) {
+            return;
+        }
+        try (java.io.InputStream in = getClass().getResourceAsStream("/logback.xml")) {
+            if (in == null) {
+                return;
+            }
+            File nioInspectorDir = new File(".NIOInspector");
+            if (!nioInspectorDir.exists() && !nioInspectorDir.mkdirs()) {
+                return;
+            }
+            File config = new File(nioInspectorDir, "logback-nioinspector.xml");
+            java.nio.file.Files.copy(in, config.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            System.setProperty("logback.configurationFile", config.getAbsolutePath());
+        } catch (IOException e) {
+            getLog().warn("Could not extract bundled logback configuration: " + e.getMessage());
         }
     }
 
